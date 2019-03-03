@@ -7,7 +7,7 @@ set(config_module_list
 	# Board support modules
 	#
 	#drivers/barometer
-	drivers/differential_pressure
+	#drivers/differential_pressure
 	#drivers/distance_sensor
 	#drivers/magnetometer
 	#drivers/telemetry
@@ -18,12 +18,12 @@ set(config_module_list
 	#drivers/imu/bmi160
 	#drivers/barometer/bmp280
 	#drivers/bst
-	drivers/camera_trigger
+	#drivers/camera_trigger
 	#drivers/frsky_telemetry
 	drivers/gps
 	#drivers/hott
 	#drivers/iridiumsbd
-	#drivers/irlock
+	drivers/irlock
 	drivers/imu/l3gd20
 	drivers/imu/lsm303d
 	drivers/magnetometer/hmc5883
@@ -31,29 +31,29 @@ set(config_module_list
 	#drivers/mb12xx
 	#drivers/mkblctrl
 	drivers/imu/mpu6000
-	drivers/imu/mpu9250
+	#drivers/imu/mpu9250
 	#drivers/oreoled
 	#drivers/protocol_splitter
-	drivers/pwm_input
+	#drivers/pwm_input
 	#drivers/pwm_out_sim
-	drivers/px4flow
+	#drivers/px4flow
 	drivers/px4fmu
 	drivers/px4io
 	drivers/rgbled
 	drivers/stm32
 	drivers/stm32/adc
-	drivers/stm32/tone_alarm
+	#drivers/stm32/tone_alarm
 	#drivers/tap_esc
-	drivers/vmount
+	#drivers/vmount
 
 	# distance sensors
-	drivers/distance_sensor/ll40ls
+	#drivers/distance_sensor/ll40ls
 	#drivers/distance_sensor/mb12xx
-	drivers/distance_sensor/sf0x
-	drivers/distance_sensor/sf1xx
-	drivers/distance_sensor/srf02
-	drivers/distance_sensor/teraranger
-	drivers/distance_sensor/tfmini
+	#drivers/distance_sensor/sf0x
+	#drivers/distance_sensor/sf1xx
+	#drivers/distance_sensor/srf02
+	#drivers/distance_sensor/teraranger
+	#drivers/distance_sensor/tfmini
 	#drivers/distance_sensor/ulanding
 	modules/sensors
 
@@ -97,7 +97,7 @@ set(config_module_list
 	#
 	# General system control
 	#
-	modules/camera_feedback
+	#modules/camera_feedback
 	modules/commander
 	modules/events
 	#modules/gpio_led
@@ -114,14 +114,14 @@ set(config_module_list
 	modules/ekf2
 	#modules/local_position_estimator
 	#modules/position_estimator_inav
-	#modules/landing_target_estimator
+	modules/landing_target_estimator
 	#modules/wind_estimator
 
 	#
 	# Vehicle Control
 	#
-	modules/fw_att_control
-	modules/fw_pos_control_l1
+	#modules/fw_att_control
+	#modules/fw_pos_control_l1
 	#modules/gnd_att_control
 	#modules/gnd_pos_control
 	modules/mc_att_control
