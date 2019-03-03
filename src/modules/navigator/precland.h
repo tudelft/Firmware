@@ -72,7 +72,9 @@ public:
 	void on_activation() override;
 	void on_active() override;
 
-	void set_mode(PrecLandMode mode) { _mode = mode; };
+void set_mode(PrecLandMode mode) {
+	_mode = PrecLandMode::Required;
+};
 
 	PrecLandMode get_mode() { return _mode; };
 
@@ -119,7 +121,7 @@ private:
 
 	PrecLandState _state{PrecLandState::Start};
 
-	PrecLandMode _mode{PrecLandMode::Opportunistic};
+	PrecLandMode _mode{PrecLandMode::Required};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::PLD_BTOUT>) _param_timeout,
