@@ -141,6 +141,7 @@ void LandingTargetEstimator::update()
 	sensor_ray(0) = -_irlockReport.pos_y * _params.scale_y; // forward
 	sensor_ray(1) = _irlockReport.pos_x * _params.scale_x; // right
 	sensor_ray(2) = 1.0f;
+	//printf("irlock: %f, %f\n",(double)sensor_ray(0),(double)sensor_ray(1));
 
 	// rotate the unit ray into the navigation frame, assume sensor frame = body frame
 	matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
