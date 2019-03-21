@@ -96,6 +96,36 @@ PARAM_DEFINE_FLOAT(PLD_FAPPR_ALT, 0.1f);
 PARAM_DEFINE_FLOAT(PLD_SRCH_ALT, 10.0f);
 
 /**
+ * Only follow
+ *
+ * @boolean
+ * @group System
+ */
+PARAM_DEFINE_INT32(PLD_ONLY_FLW, 0);
+
+/**
+ * Time out during horizontal approach. 
+ *
+ * Max time that the target is lost seen and predicted based on the v esitmate.
+ *
+ * @min 1000
+ * @max 30000000
+ * @group Precision Land
+ */
+PARAM_DEFINE_INT32(PLD_FLW_TOUT, 10000000);
+
+/**
+ * Smoothing filter width velocity predition target
+ *
+ * For the predition of the movement of the target, a smoothing filter is used.
+ *
+ * @min 1
+ * @max 5000
+ * @group Precision Land
+ */
+PARAM_DEFINE_INT32(PLD_SMT_WDT, 100);
+
+/**
  * Search timeout
  *
  * Time allowed to search for the landing target before falling back to normal landing.

@@ -48,6 +48,42 @@
 #include "navigator_mode.h"
 #include "mission_block.h"
 
+#include <iostream>
+#include <vector>
+
+
+
+
+/*
+ * This class performs moving average filtering
+ *
+ */
+class Smoother
+{
+
+  private:
+	std::vector<float> _rbuf; // rotary buffer
+	int _kernelsize;          // filter kernel width
+	int _rotater;             //pointer to current sample in rotary buffer
+	float _runner;            // current filter output value
+	bool _ready = false;
+
+  public:
+	void init(int width);
+	void init(int width, float value);
+	float addSample(float sample);
+	float get_latest();
+	void reset(void);
+	void reset_to(float v);
+	bool get_ready()
+	{
+		return _ready;
+	}
+	int get_kernselsize() { return _kernelsize;}
+};
+
+
+
 enum class PrecLandState {
 	Start, // Starting state
 	HorizontalApproach, // Positioning over landing target while maintaining altitude
@@ -72,9 +108,9 @@ public:
 	void on_activation() override;
 	void on_active() override;
 
-void set_mode(PrecLandMode mode) {
-	_mode = PrecLandMode::Required;
-};
+	void set_mode(PrecLandMode mode) {
+		_mode = PrecLandMode::Required;
+	};
 
 	PrecLandMode get_mode() { return _mode; };
 
@@ -101,6 +137,8 @@ private:
 	void slewrate(float &sp_x, float &sp_y);
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
+	float _predicted_target_pose_x;
+	float _predicted_target_pose_y;
 
 	int _target_pose_sub{-1};
 	bool _target_pose_valid{false}; /**< whether we have received a landing target position message */
@@ -119,19 +157,28 @@ private:
 	matrix::Vector2f _sp_pev;
 	matrix::Vector2f _sp_pev_prev;
 
+	Smoother v_x,v_y;
+	float last_good_target_pose_x;
+	float last_good_target_pose_y;
+	uint64_t last_good_target_pose_time;
+	bool v_prev_initialised = false;
+
 	PrecLandState _state{PrecLandState::Start};
 
 	PrecLandMode _mode{PrecLandMode::Required};
 
 	DEFINE_PARAMETERS(
-		(ParamFloat<px4::params::PLD_BTOUT>) _param_timeout,
-		(ParamFloat<px4::params::PLD_HACC_RAD>) _param_hacc_rad,
-		(ParamFloat<px4::params::PLD_FAPPR_ALT>) _param_final_approach_alt,
-		(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
-		(ParamFloat<px4::params::PLD_SRCH_TOUT>) _param_search_timeout,
-		(ParamInt<px4::params::PLD_MAX_SRCH>) _param_max_searches,
-		(ParamFloat<px4::params::MPC_ACC_HOR>) _param_acceleration_hor,
-		(ParamFloat<px4::params::MPC_XY_CRUISE>) _param_xy_vel_cruise
-	)
+			(ParamFloat<px4::params::PLD_BTOUT>) _param_timeout,
+			(ParamFloat<px4::params::PLD_HACC_RAD>) _param_hacc_rad,
+			(ParamFloat<px4::params::PLD_FAPPR_ALT>) _param_final_approach_alt,
+			(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
+			(ParamInt<px4::params::PLD_ONLY_FLW>) _param_only_flw,
+			(ParamInt<px4::params::PLD_FLW_TOUT>) _param_flw_tout,
+			(ParamInt<px4::params::PLD_SMT_WDT>) _param_smt_wdt,
+			(ParamFloat<px4::params::PLD_SRCH_TOUT>) _param_search_timeout,
+			(ParamInt<px4::params::PLD_MAX_SRCH>) _param_max_searches,
+			(ParamFloat<px4::params::MPC_ACC_HOR>) _param_acceleration_hor,
+			(ParamFloat<px4::params::MPC_XY_CRUISE>) _param_xy_vel_cruise
+			)
 
 };

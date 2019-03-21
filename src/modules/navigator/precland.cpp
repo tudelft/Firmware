@@ -68,6 +68,10 @@ PrecLand::PrecLand(Navigator *navigator) :
 void
 PrecLand::on_activation()
 {
+	v_x.init(_param_smt_wdt.get());
+	v_y.init(_param_smt_wdt.get());
+	v_prev_initialised = false;
+
 	// We need to subscribe here and not in the constructor because constructor is called before the navigator task is spawned
 	if (_target_pose_sub < 0) {
 		_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
@@ -124,6 +128,40 @@ PrecLand::on_active()
 		switch_to_state_done();
 	}
 
+	uint64_t now = hrt_absolute_time();
+	if(_target_pose_valid && _target_pose.abs_pos_valid){
+
+		float dt = (now - last_good_target_pose_time);
+		dt /= SEC2USEC;
+		if (v_prev_initialised){
+			v_x.addSample((_target_pose.x_abs-last_good_target_pose_x)/dt);
+			v_y.addSample((_target_pose.y_abs-last_good_target_pose_y)/dt);
+		}
+
+	}
+	if(v_x.get_ready()){
+
+		float dt = (now - last_good_target_pose_time);
+		dt /= SEC2USEC;
+		_predicted_target_pose_x = last_good_target_pose_x + dt * v_x.get_latest();
+		_predicted_target_pose_y = last_good_target_pose_y + dt * v_y.get_latest();
+		PX4_INFO("Measured: %f, %f. Predicted: %f, %f. dt: %f",
+				 static_cast<double>(last_good_target_pose_x),
+				 static_cast<double>(last_good_target_pose_y),
+				 static_cast<double>(_predicted_target_pose_x),
+				 static_cast<double>(_predicted_target_pose_y),
+				 static_cast<double>(dt));
+	} else if(_target_pose_valid && _target_pose.abs_pos_valid){
+		_predicted_target_pose_x = _target_pose.x_abs;
+		_predicted_target_pose_y = _target_pose.y_abs;
+	}
+	if(_target_pose_valid && _target_pose.abs_pos_valid){
+		last_good_target_pose_time = now;
+		last_good_target_pose_x = _target_pose.x_abs;
+		last_good_target_pose_y = _target_pose.y_abs;
+		v_prev_initialised = true;
+	}
+
 	switch (_state) {
 	case PrecLandState::Start:
 		run_state_start();
@@ -177,7 +215,7 @@ PrecLand::run_state_start()
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	float dist = get_distance_to_next_waypoint(pos_sp_triplet->current.lat, pos_sp_triplet->current.lon,
-			_navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
+											   _navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
 
 	// check if we've reached the start point
 	if (dist < _navigator->get_acceptance_radius()) {
@@ -227,7 +265,10 @@ PrecLand::run_state_horizontal_approach()
 		return;
 	}
 
-	if (check_state_conditions(PrecLandState::DescendAboveTarget)) {
+	if(_param_only_flw.get())
+		_state_start_time = hrt_absolute_time();
+
+	if (check_state_conditions(PrecLandState::DescendAboveTarget) && !_param_only_flw.get()) {
 		if (!_point_reached_time) {
 			_point_reached_time = hrt_absolute_time();
 		}
@@ -241,7 +282,7 @@ PrecLand::run_state_horizontal_approach()
 
 	}
 
-	if (hrt_absolute_time() - _state_start_time > STATE_TIMEOUT) {
+	if (hrt_absolute_time() - _state_start_time > STATE_TIMEOUT && !_param_only_flw.get()) {
 		PX4_ERR("Precision landing took too long during horizontal approach phase.");
 
 		if (switch_to_state_fallback()) {
@@ -251,14 +292,11 @@ PrecLand::run_state_horizontal_approach()
 		PX4_ERR("Can't switch to fallback landing");
 	}
 
-	float x = _target_pose.x_abs;
-	float y = _target_pose.y_abs;
-
-	slewrate(x, y);
+	slewrate(_predicted_target_pose_x, _predicted_target_pose_y);
 
 	// XXX need to transform to GPS coords because mc_pos_control only looks at that
 	double lat, lon;
-	map_projection_reproject(&_map_ref, x, y, &lat, &lon);
+	map_projection_reproject(&_map_ref, _predicted_target_pose_x, _predicted_target_pose_y, &lat, &lon);
 
 	pos_sp_triplet->current.lat = lat;
 	pos_sp_triplet->current.lon = lon;
@@ -295,7 +333,7 @@ PrecLand::run_state_descend_above_target()
 
 	// XXX need to transform to GPS coords because mc_pos_control only looks at that
 	double lat, lon;
-	map_projection_reproject(&_map_ref, _target_pose.x_abs, _target_pose.y_abs, &lat, &lon);
+	map_projection_reproject(&_map_ref, _predicted_target_pose_x, _predicted_target_pose_y, &lat, &lon);
 
 	pos_sp_triplet->current.lat = lat;
 	pos_sp_triplet->current.lon = lon;
@@ -464,10 +502,13 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 
 		// if we're already in this state, only want to make it invalid if we reached the target but can't see it anymore
 		if (_state == PrecLandState::HorizontalApproach) {
-			if (fabsf(_target_pose.x_abs - vehicle_local_position->x) < _param_hacc_rad.get()
-			    && fabsf(_target_pose.y_abs - vehicle_local_position->y) < _param_hacc_rad.get()) {
+			if (fabsf(_predicted_target_pose_x - vehicle_local_position->x) < _param_hacc_rad.get()
+					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < _param_hacc_rad.get()) {
 				// we've reached the position where we last saw the target. If we don't see it now, we need to do something
-				return _target_pose_valid && _target_pose.abs_pos_valid;
+
+				//use the prediction (but only if available -> filter is ready) until the timeout
+				return ((v_x.get_ready() && last_good_target_pose_time - hrt_absolute_time() < static_cast<uint32_t>(_param_flw_tout.get())) ||
+						(_target_pose_valid && _target_pose.abs_pos_valid));
 
 			} else {
 				// We've seen the target sometime during horizontal approach.
@@ -494,13 +535,13 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		} else {
 			// if not already in this state, need to be above target to enter it
 			return _target_pose_updated && _target_pose.abs_pos_valid
-			       && fabsf(_target_pose.x_abs - vehicle_local_position->x) < _param_hacc_rad.get()
-			       && fabsf(_target_pose.y_abs - vehicle_local_position->y) < _param_hacc_rad.get();
+					&& fabsf(_predicted_target_pose_x - vehicle_local_position->x) < _param_hacc_rad.get()
+					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < _param_hacc_rad.get();
 		}
 
 	case PrecLandState::FinalApproach:
 		return _target_pose_valid && _target_pose.abs_pos_valid
-		       && (_target_pose.z_abs - vehicle_local_position->z) < _param_final_approach_alt.get();
+				&& (_target_pose.z_abs - vehicle_local_position->z) < _param_final_approach_alt.get();
 
 	case PrecLandState::Search:
 		return true;
@@ -535,7 +576,7 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 		// set a best guess for previous setpoints for smooth transition
 		map_projection_project(&_map_ref, _navigator->get_position_setpoint_triplet()->current.lat,
-				       _navigator->get_position_setpoint_triplet()->current.lon, &_sp_pev(0), &_sp_pev(1));
+							   _navigator->get_position_setpoint_triplet()->current.lon, &_sp_pev(0), &_sp_pev(1));
 		_sp_pev_prev(0) = _sp_pev(0) - _navigator->get_local_position()->vx * dt;
 		_sp_pev_prev(1) = _sp_pev(1) - _navigator->get_local_position()->vy * dt;
 	}
@@ -560,7 +601,7 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 	// limit the setpoint speed such that we can stop at the setpoint given the maximum acceleration/deceleration
 	float max_spd = sqrtf(_param_acceleration_hor.get() * ((matrix::Vector2f)(_sp_pev - matrix::Vector2f(sp_x,
-			      sp_y))).length());
+																										 sp_y))).length());
 	sp_vel = (sp_curr - _sp_pev) / dt; // velocity of the setpoints
 
 	if (sp_vel.length() > max_spd) {
@@ -574,3 +615,77 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 	sp_x = sp_curr(0);
 	sp_y = sp_curr(1);
 }
+
+
+
+void Smoother::init(int width, float value)
+{
+	_kernelsize = width;
+	_rbuf.resize(_kernelsize + 1);
+	_rotater = 0;
+	_runner = value*_kernelsize;
+
+	for (int i = 0; i <= _kernelsize; i++)
+	{
+		_rbuf.at(i) = value;
+	}
+}
+
+void Smoother::init(int width)
+{
+	init(width,0);
+}
+
+void Smoother::reset()
+{
+	_rotater = 0;
+	for (int i = 0; i <= _kernelsize; i++)
+	{
+		_rbuf.at(i) = 0;
+	}
+	_runner = 0;
+	_ready = false;
+}
+void Smoother::reset_to(float v)
+{
+	_rotater = 0;
+	for (int i = 0; i <= _kernelsize; i++)
+	{
+		_rbuf.at(i) = v;
+	}
+	_runner = v*_kernelsize;
+	_ready = true;
+}
+
+float Smoother::addSample(float sample)
+{
+	//performs online smoothing filter
+
+	if (isnanf(sample)) // fixes nan, which forever destroy the output
+		sample = 0;
+	if (_kernelsize == 1)
+	{ // disable smoothing... to be sure:
+		return sample;
+	}
+
+	_rbuf.at(_rotater) = sample;                     // overwrite oldest sample in the roundtrip buffer
+	_rotater = (_rotater + 1) % (_kernelsize + 1);   //update pointer to buffer
+	_runner = _runner + sample - _rbuf.at(_rotater); //add new sample, subtract the new oldest sample
+
+	if (!_ready)
+	{ // check if completely filled
+		if (_rotater == 0)
+			_ready = true;
+		else
+			return _runner / _rotater; // if not filled completely, return average over the amount of added data (the rest of the filter is initialised to zero)
+	}
+
+	return _runner / _kernelsize;
+}
+
+float Smoother::get_latest()
+{
+	return _runner / _kernelsize;
+}
+
+
