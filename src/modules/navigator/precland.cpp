@@ -70,6 +70,7 @@ PrecLand::on_activation()
 {
 	v_x.init(_param_smt_wdt.get());
 	v_y.init(_param_smt_wdt.get());
+	land_speed.init(5,0.1f);
 	v_prev_initialised = false;
 
 	// We need to subscribe here and not in the constructor because constructor is called before the navigator task is spawned
@@ -128,39 +129,8 @@ PrecLand::on_active()
 		switch_to_state_done();
 	}
 
-	uint64_t now = hrt_absolute_time();
-	if(_target_pose_valid && _target_pose.abs_pos_valid){
-
-		float dt = (now - last_good_target_pose_time);
-		dt /= SEC2USEC;
-		if (v_prev_initialised){
-			v_x.addSample((_target_pose.x_abs-last_good_target_pose_x)/dt);
-			v_y.addSample((_target_pose.y_abs-last_good_target_pose_y)/dt);
-		}
-
-	}
-	if(v_x.get_ready()){
-
-		float dt = (now - last_good_target_pose_time);
-		dt /= SEC2USEC;
-		_predicted_target_pose_x = last_good_target_pose_x + dt * v_x.get_latest();
-		_predicted_target_pose_y = last_good_target_pose_y + dt * v_y.get_latest();
-		PX4_INFO("Measured: %f, %f. Predicted: %f, %f. dt: %f",
-				 static_cast<double>(last_good_target_pose_x),
-				 static_cast<double>(last_good_target_pose_y),
-				 static_cast<double>(_predicted_target_pose_x),
-				 static_cast<double>(_predicted_target_pose_y),
-				 static_cast<double>(dt));
-	} else if(_target_pose_valid && _target_pose.abs_pos_valid){
-		_predicted_target_pose_x = _target_pose.x_abs;
-		_predicted_target_pose_y = _target_pose.y_abs;
-	}
-	if(_target_pose_valid && _target_pose.abs_pos_valid){
-		last_good_target_pose_time = now;
-		last_good_target_pose_x = _target_pose.x_abs;
-		last_good_target_pose_y = _target_pose.y_abs;
-		v_prev_initialised = true;
-	}
+	//predict (moving) target location, if target is in sight
+	predict_target();
 
 	switch (_state) {
 	case PrecLandState::Start:
@@ -196,6 +166,53 @@ PrecLand::on_active()
 		break;
 	}
 
+}
+
+void PrecLand::predict_target() {
+	uint64_t now = hrt_absolute_time();
+	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
+	dt /= SEC2USEC;
+	if(_target_pose_valid && _target_pose.abs_pos_valid){
+		if (v_prev_initialised){
+			v_x.addSample((_target_pose.x_abs-last_good_target_pose_x)/dt);
+			v_y.addSample((_target_pose.y_abs-last_good_target_pose_y)/dt);
+		}
+
+		float ls;
+		ls = _target_pose.raw_angle*0.7f; // todo: 0.7 -> use land speed param
+		if (ls > 0.7f)
+			ls = 0.7f;
+		else if (ls<0.05f)
+			ls = 0.05f;
+		land_speed.addSample(ls);
+
+		PX4_INFO("_target_pose.raw_angle: %f",
+				 static_cast<double>(land_speed.get_latest()));
+	} else {
+		land_speed.addSample(0.05);
+	}
+
+	if(v_x.get_ready()){ // do we have enough data to predict?
+		_predicted_target_pose_x = last_good_target_pose_x + dt * v_x.get_latest();
+		_predicted_target_pose_y = last_good_target_pose_y + dt * v_y.get_latest();
+//		PX4_INFO("Measured: %f, %f. Predicted: %f, %f. dt: %f . Recommended landspeed: %f",
+//				 static_cast<double>(last_good_target_pose_x),
+//				 static_cast<double>(last_good_target_pose_y),
+//				 static_cast<double>(_predicted_target_pose_x),
+//				 static_cast<double>(_predicted_target_pose_y),
+//				 static_cast<double>(dt),
+//				 static_cast<double>(land_speed.get_latest()));
+	} else if(_target_pose_valid && _target_pose.abs_pos_valid){ // if we cannot predict yet, use the acutal sighted position of the target
+		_predicted_target_pose_x = _target_pose.x_abs;
+		_predicted_target_pose_y = _target_pose.y_abs;
+	}
+
+	if(_target_pose_valid && _target_pose.abs_pos_valid){
+		last_good_target_pose_time = now;
+		last_good_target_pose_x = _target_pose.x_abs;
+		last_good_target_pose_y = _target_pose.y_abs;
+		v_prev_initialised = true;
+	}
 }
 
 void
@@ -337,6 +354,8 @@ PrecLand::run_state_descend_above_target()
 
 	pos_sp_triplet->current.lat = lat;
 	pos_sp_triplet->current.lon = lon;
+
+	pos_sp_triplet->current.vz = land_speed.get_latest();
 
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
 
@@ -504,15 +523,15 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		if (_state == PrecLandState::HorizontalApproach) {
 			if (fabsf(_predicted_target_pose_x - vehicle_local_position->x) < _param_hacc_rad.get()
 					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < _param_hacc_rad.get()) {
-				// we've reached the position where we last saw the target. If we don't see it now, we need to do something
+				// we've reached the position where we predicted we'd see the target. If we don't see it now, we may need to do something
 
-				//use the prediction (but only if available -> filter is ready) until the timeout
+				//continue to go to the prediction (but only if available -> filter is ready) until the timeout, or if we actually see the target now
 				return ((v_x.get_ready() && last_good_target_pose_time - hrt_absolute_time() < static_cast<uint32_t>(_param_flw_tout.get())) ||
 						(_target_pose_valid && _target_pose.abs_pos_valid));
 
 			} else {
-				// We've seen the target sometime during horizontal approach.
-				// Even if we don't see it as we're moving towards it, continue approaching last known location
+				// We've seen the target sometime during horizontal approach. So, let's go there and see what we've got when we get there..
+				// So, even if we don't see it as we're moving towards it, continue approaching last known location (or the predicted new location if available)
 				return true;
 			}
 		}

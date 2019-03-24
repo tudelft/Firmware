@@ -207,6 +207,17 @@ void LandingTargetEstimator::update()
 			_target_pose.vx_rel = xvel;
 			_target_pose.vy_rel = yvel;
 
+
+			float a;
+			if (fabs(sensor_ray(0)) > fabs(sensor_ray(1)))
+				a = fabs(sensor_ray(0));
+			else
+				a = fabs(sensor_ray(1));
+			if (a>0.4f) // 30 degrees, cause realsense FOV. Todo: width FOV is bigger, but no time
+				a = 0.5f;
+			a = a / 0.5f; // normalize between 0 - 1;
+			_target_pose.raw_angle = 1.f-a;
+
 			_target_pose.cov_x_rel = covx;
 			_target_pose.cov_y_rel = covy;
 

@@ -1450,6 +1450,9 @@ MulticopterPositionControl::control_non_manual()
 	/* use constant descend rate when landing, ignore altitude setpoint */
 	if (_pos_sp_triplet.current.valid
 	    && _pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND) {
+		if (fabs(_pos_sp_triplet.current.vz)>0.01f) {
+			_vel_sp(2) = _pos_sp_triplet.current.vz;
+		} else
 		_vel_sp(2) = _land_speed.get();
 		_run_alt_control = false;
 	}

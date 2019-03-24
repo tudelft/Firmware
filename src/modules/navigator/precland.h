@@ -135,6 +135,7 @@ private:
 	// check if a given state could be changed into. Return true if possible to transition to state, false otherwise
 	bool check_state_conditions(PrecLandState state);
 	void slewrate(float &sp_x, float &sp_y);
+	void predict_target();
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
 	float _predicted_target_pose_x;
@@ -157,7 +158,7 @@ private:
 	matrix::Vector2f _sp_pev;
 	matrix::Vector2f _sp_pev_prev;
 
-	Smoother v_x,v_y;
+	Smoother v_x,v_y,land_speed;
 	float last_good_target_pose_x;
 	float last_good_target_pose_y;
 	uint64_t last_good_target_pose_time;
