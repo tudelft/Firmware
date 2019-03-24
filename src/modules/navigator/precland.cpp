@@ -186,8 +186,8 @@ void PrecLand::predict_target() {
 			ls = 0.05f;
 		land_speed.addSample(ls);
 
-		PX4_INFO("_target_pose.raw_angle: %f",
-				 static_cast<double>(land_speed.get_latest()));
+//		PX4_INFO("_target_pose.raw_angle: %f",
+//				 static_cast<double>(land_speed.get_latest()));
 	} else {
 		land_speed.addSample(0.05);
 	}
