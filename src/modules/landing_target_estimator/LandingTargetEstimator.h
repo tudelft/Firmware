@@ -156,11 +156,15 @@ private:
 	bool _estimator_initialized;
 	// keep track of whether last measurement was rejected
 	bool _faulty;
+	bool _zero_faulty;
 
 	matrix::Dcm<float> _R_att;
 	matrix::Vector<float, 2> _rel_pos;
+	matrix::Vector<float, 2> _zero_rel_pos;
 	KalmanFilter _kalman_filter_x;
 	KalmanFilter _kalman_filter_y;
+	KalmanFilter _kalman_filter_zero_x;
+	KalmanFilter _kalman_filter_zero_y;
 	hrt_abstime _last_predict; // timestamp of last filter prediction
 	hrt_abstime _last_update; // timestamp of last filter update (used to check timeout)
 

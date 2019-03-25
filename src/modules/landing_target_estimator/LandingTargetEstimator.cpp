@@ -113,6 +113,9 @@ void LandingTargetEstimator::update()
 			_kalman_filter_x.predict(dt, -a(0), _params.acc_unc);
 			_kalman_filter_y.predict(dt, -a(1), _params.acc_unc);
 
+			_kalman_filter_zero_x.predict(dt, -a(0), _params.acc_unc);
+			_kalman_filter_zero_y.predict(dt, -a(1), _params.acc_unc);
+
 			_last_predict = hrt_absolute_time();
 		}
 	}
@@ -143,10 +146,17 @@ void LandingTargetEstimator::update()
 	sensor_ray(2) = 1.0f;
 	//printf("irlock: %f, %f\n",(double)sensor_ray(0),(double)sensor_ray(1));
 
+
+	matrix::Vector<float, 3> zero_ray; // to check what would be the projected location of a target if it would be in the middle of the image
+	zero_ray(0) = 0.0f;
+	zero_ray(1) = 0.0f;
+	zero_ray(2) = 1.0f;
+
 	// rotate the unit ray into the navigation frame, assume sensor frame = body frame
 	matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
 	_R_att = matrix::Dcm<float>(q_att);
 	sensor_ray = _R_att * sensor_ray;
+	zero_ray = _R_att * zero_ray;
 
 	if (fabsf(sensor_ray(2)) < 1e-6f) {
 		// z component of measurement unsafe, don't use this measurement
@@ -159,12 +169,18 @@ void LandingTargetEstimator::update()
 	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist;
 	_rel_pos(1) = sensor_ray(1) / sensor_ray(2) * dist;
 
+	_zero_rel_pos(0) = zero_ray(0) / zero_ray(2) * dist;
+	_zero_rel_pos(1) = zero_ray(1) / zero_ray(2) * dist;
+
 	if (!_estimator_initialized) {
 		PX4_INFO("Init");
 		float vx_init = _vehicleLocalPosition.v_xy_valid ? -_vehicleLocalPosition.vx : 0.f;
 		float vy_init = _vehicleLocalPosition.v_xy_valid ? -_vehicleLocalPosition.vy : 0.f;
 		_kalman_filter_x.init(_rel_pos(0), vx_init, _params.pos_unc_init, _params.vel_unc_init);
 		_kalman_filter_y.init(_rel_pos(1), vy_init, _params.pos_unc_init, _params.vel_unc_init);
+
+		_kalman_filter_zero_x.init(_zero_rel_pos(0), vx_init, _params.pos_unc_init, _params.vel_unc_init);
+		_kalman_filter_zero_y.init(_zero_rel_pos(1), vy_init, _params.pos_unc_init, _params.vel_unc_init);
 
 		_estimator_initialized = true;
 		_last_update = hrt_absolute_time();
@@ -175,6 +191,9 @@ void LandingTargetEstimator::update()
 		bool update_x = _kalman_filter_x.update(_rel_pos(0), _params.meas_unc * dist * dist);
 		bool update_y = _kalman_filter_y.update(_rel_pos(1), _params.meas_unc * dist * dist);
 
+		bool zero_update_x = _kalman_filter_zero_x.update(_zero_rel_pos(0), _params.meas_unc * dist * dist);
+		bool zero_update_y = _kalman_filter_zero_y.update(_zero_rel_pos(1), _params.meas_unc * dist * dist);
+
 		if (!update_x || !update_y) {
 			if (!_faulty) {
 				_faulty = true;
@@ -184,6 +203,14 @@ void LandingTargetEstimator::update()
 		} else {
 			_faulty = false;
 		}
+		if (!update_x || !update_y) {
+			if (!_zero_faulty) {
+				_zero_faulty=true;
+				PX4_WARN("Landing target zero measurement rejected:%s%s", zero_update_x ? "" : " x", zero_update_y ? "" : " y");
+			}
+		} else {
+			_zero_faulty = false;
+		}
 
 		if (!_faulty) {
 			// only publish if both measurements were good
@@ -191,38 +218,45 @@ void LandingTargetEstimator::update()
 			_target_pose.timestamp = _irlockReport.timestamp;
 
 			float x, xvel, y, yvel, covx, covx_v, covy, covy_v;
+			float zero_x, zero_xvel, zero_y, zero_yvel, zero_covx, zero_covx_v, zero_covy, zero_covy_v;
 			_kalman_filter_x.getState(x, xvel);
 			_kalman_filter_x.getCovariance(covx, covx_v);
 
 			_kalman_filter_y.getState(y, yvel);
 			_kalman_filter_y.getCovariance(covy, covy_v);
 
+			_kalman_filter_zero_x.getState(zero_x, zero_xvel);
+			_kalman_filter_zero_x.getCovariance(zero_covx, zero_covx_v);
+
+			_kalman_filter_zero_y.getState(zero_y, zero_yvel);
+			_kalman_filter_zero_y.getCovariance(zero_covy, zero_covy_v);
+
 			_target_pose.is_static = (_params.mode == TargetMode::Stationary);
 
-			_target_pose.rel_pos_valid = true;
-			_target_pose.rel_vel_valid = true;
+			_target_pose.rel_pos_valid = !_faulty;
+			_target_pose.rel_vel_valid = !_faulty;
 			_target_pose.x_rel = x;
 			_target_pose.y_rel = y;
 			_target_pose.z_rel = dist;
 			_target_pose.vx_rel = xvel;
 			_target_pose.vy_rel = yvel;
-
-
-			float a;
-			if (fabs(sensor_ray(0)) > fabs(sensor_ray(1)))
-				a = fabs(sensor_ray(0));
-			else
-				a = fabs(sensor_ray(1));
-			if (a>0.4f) // 30 degrees, cause realsense FOV. Todo: width FOV is bigger, but no time
-				a = 0.5f;
-			a = a / 0.5f; // normalize between 0 - 1;
-			_target_pose.raw_angle = 1.f-a;
-
 			_target_pose.cov_x_rel = covx;
 			_target_pose.cov_y_rel = covy;
-
 			_target_pose.cov_vx_rel = covx_v;
 			_target_pose.cov_vy_rel = covy_v;
+
+			_target_pose.zero_rel_pos_valid = !_zero_faulty;
+			_target_pose.zero_rel_vel_valid = !_zero_faulty;
+			_target_pose.zero_x_rel = zero_x;
+			_target_pose.zero_y_rel = zero_y;
+			_target_pose.zero_z_rel = dist;
+			_target_pose.zero_vx_rel = zero_xvel;
+			_target_pose.zero_vy_rel = zero_yvel;
+			_target_pose.zero_cov_x_rel = zero_covx;
+			_target_pose.zero_cov_y_rel = zero_covy;
+			_target_pose.zero_cov_vx_rel = covx_v;
+			_target_pose.zero_cov_vy_rel = covy_v;
+
 
 			if (_vehicleLocalPosition_valid && _vehicleLocalPosition.xy_valid) {
 				_target_pose.x_abs = x + _vehicleLocalPosition.x;
@@ -230,9 +264,25 @@ void LandingTargetEstimator::update()
 				_target_pose.z_abs = dist + _vehicleLocalPosition.z;
 				_target_pose.abs_pos_valid = true;
 
+				_target_pose.zero_x_abs = zero_x + _vehicleLocalPosition.x;
+				_target_pose.zero_y_abs = zero_y + _vehicleLocalPosition.y;
+				_target_pose.zero_z_abs = dist + _vehicleLocalPosition.z;
+				_target_pose.zero_abs_pos_valid = true;
+
 			} else {
 				_target_pose.abs_pos_valid = false;
+				_target_pose.zero_abs_pos_valid = false;
 			}
+
+			float a;
+			if (fabs(sensor_ray(0)) > fabs(sensor_ray(1)))
+				a = fabs(sensor_ray(0));
+			else
+				a = fabs(sensor_ray(1));
+			if (a>0.4f) // 30 degrees, cause realsense FOV. Todo: width FOV is bigger, need to split
+				a = 0.5f;
+			a = a / 0.5f; // normalize between 0 - 1;
+			_target_pose.raw_angle = 1.f-a;
 
 			if (_targetPosePub == nullptr) {
 				_targetPosePub = orb_advertise(ORB_ID(landing_target_pose), &_target_pose);
