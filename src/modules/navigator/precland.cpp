@@ -186,8 +186,8 @@ void PrecLand::predict_target() {
 			ls = 0.05f;
 		land_speed.addSample(ls);
 
-//		PX4_INFO("_target_pose.raw_angle: %f",
-//				 static_cast<double>(land_speed.get_latest()));
+		//		PX4_INFO("_target_pose.raw_angle: %f",
+		//				 static_cast<double>(land_speed.get_latest()));
 	} else {
 		land_speed.addSample(0.05);
 	}
@@ -195,13 +195,13 @@ void PrecLand::predict_target() {
 	if(v_x.get_ready()){ // do we have enough data to predict?
 		_predicted_target_pose_x = last_good_target_pose_x + dt * v_x.get_latest();
 		_predicted_target_pose_y = last_good_target_pose_y + dt * v_y.get_latest();
-//		PX4_INFO("Measured: %f, %f. Predicted: %f, %f. dt: %f . Recommended landspeed: %f",
-//				 static_cast<double>(last_good_target_pose_x),
-//				 static_cast<double>(last_good_target_pose_y),
-//				 static_cast<double>(_predicted_target_pose_x),
-//				 static_cast<double>(_predicted_target_pose_y),
-//				 static_cast<double>(dt),
-//				 static_cast<double>(land_speed.get_latest()));
+		//		PX4_INFO("Measured: %f, %f. Predicted: %f, %f. dt: %f . Recommended landspeed: %f",
+		//				 static_cast<double>(last_good_target_pose_x),
+		//				 static_cast<double>(last_good_target_pose_y),
+		//				 static_cast<double>(_predicted_target_pose_x),
+		//				 static_cast<double>(_predicted_target_pose_y),
+		//				 static_cast<double>(dt),
+		//				 static_cast<double>(land_speed.get_latest()));
 	} else if(_target_pose_valid && _target_pose.abs_pos_valid){ // if we cannot predict yet, use the acutal sighted position of the target
 		_predicted_target_pose_x = _target_pose.x_abs;
 		_predicted_target_pose_y = _target_pose.y_abs;
@@ -232,7 +232,7 @@ PrecLand::run_state_start()
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	float dist = get_distance_to_next_waypoint(pos_sp_triplet->current.lat, pos_sp_triplet->current.lon,
-											   _navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
+						   _navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
 
 	// check if we've reached the start point
 	if (dist < _navigator->get_acceptance_radius()) {
@@ -302,8 +302,10 @@ PrecLand::run_state_horizontal_approach()
 	if (hrt_absolute_time() - _state_start_time > STATE_TIMEOUT && !_param_only_flw.get()) {
 		PX4_ERR("Precision landing took too long during horizontal approach phase.");
 
-		if (switch_to_state_fallback()) {
-			return;
+		if (!switch_to_state_start()) {
+			if (!switch_to_state_fallback()) {
+				PX4_ERR("Can't switch to fallback landing");
+			}
 		}
 
 		PX4_ERR("Can't switch to fallback landing");
@@ -527,7 +529,7 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 
 				//continue to go to the prediction (but only if available -> filter is ready) until the timeout, or if we actually see the target now
 				return ((v_x.get_ready() && last_good_target_pose_time - hrt_absolute_time() < static_cast<uint32_t>(_param_flw_tout.get())) ||
-						(_target_pose_valid && _target_pose.abs_pos_valid));
+					(_target_pose_valid && _target_pose.abs_pos_valid));
 
 			} else {
 				// We've seen the target sometime during horizontal approach. So, let's go there and see what we've got when we get there..
@@ -595,7 +597,7 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 		// set a best guess for previous setpoints for smooth transition
 		map_projection_project(&_map_ref, _navigator->get_position_setpoint_triplet()->current.lat,
-							   _navigator->get_position_setpoint_triplet()->current.lon, &_sp_pev(0), &_sp_pev(1));
+				       _navigator->get_position_setpoint_triplet()->current.lon, &_sp_pev(0), &_sp_pev(1));
 		_sp_pev_prev(0) = _sp_pev(0) - _navigator->get_local_position()->vx * dt;
 		_sp_pev_prev(1) = _sp_pev(1) - _navigator->get_local_position()->vy * dt;
 	}
@@ -620,7 +622,7 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 	// limit the setpoint speed such that we can stop at the setpoint given the maximum acceleration/deceleration
 	float max_spd = sqrtf(_param_acceleration_hor.get() * ((matrix::Vector2f)(_sp_pev - matrix::Vector2f(sp_x,
-																										 sp_y))).length());
+													     sp_y))).length());
 	sp_vel = (sp_curr - _sp_pev) / dt; // velocity of the setpoints
 
 	if (sp_vel.length() > max_spd) {
