@@ -70,6 +70,8 @@ PrecLand::on_activation()
 {
 	v_x.init(_param_smt_wdt.get());
 	v_y.init(_param_smt_wdt.get());
+	diff_x.init(100);
+	diff_y.init(100);
 	land_speed.init(5,0.1f);
 	v_prev_initialised = false;
 
@@ -172,11 +174,13 @@ void PrecLand::predict_target() {
 	uint64_t now = hrt_absolute_time();
 	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
 	dt /= SEC2USEC;
-	if(_target_pose_valid && _target_pose.abs_pos_valid){
+	if(_target_pose_valid && _target_pose.abs_pos_valid ){
 		if (v_prev_initialised){
-			v_x.addSample((_target_pose.x_abs-last_good_target_pose_x)/dt);
-			v_y.addSample((_target_pose.y_abs-last_good_target_pose_y)/dt);
+			vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+			v_x.addSample(_target_pose.vx_rel + vehicle_local_position->vx);
+			v_y.addSample(_target_pose.vy_rel + vehicle_local_position->vy);
 		}
+		std::cout << "v : " << v_x.get_latest() << ", "<< v_y.get_latest() << " dt " << dt << " posy " << _target_pose.y_abs << " dy " << _target_pose.y_abs-last_good_target_pose_y << std::endl;
 
 		float ls;
 		ls = _target_pose.raw_angle*0.7f; // todo: 0.7 -> use land speed param
@@ -202,9 +206,27 @@ void PrecLand::predict_target() {
 		//				 static_cast<double>(_predicted_target_pose_y),
 		//				 static_cast<double>(dt),
 		//				 static_cast<double>(land_speed.get_latest()));
+
+		vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+		if(_target_pose_valid && _target_pose.abs_pos_valid && (fabsf(v_x.get_latest() - vehicle_local_position->vx) < 0.2f) && (fabsf(v_y.get_latest() - vehicle_local_position->vy) < 0.2f)){
+			diff_x.addSample(_target_pose.x_rel - _target_pose.zero_x_rel);
+			diff_y.addSample(_target_pose.y_rel - _target_pose.zero_y_rel);
+//			printf("v diff: %f, %f\n", (double)fabs(v_x.get_latest() - vehicle_local_position->vx),(double)fabs(v_y.get_latest() - vehicle_local_position->vy));
+		} else {
+			diff_x.addSample(0);
+			diff_y.addSample(0);
+		}
+
+
 	} else if(_target_pose_valid && _target_pose.abs_pos_valid){ // if we cannot predict yet, use the acutal sighted position of the target
 		_predicted_target_pose_x = _target_pose.x_abs;
 		_predicted_target_pose_y = _target_pose.y_abs;
+	}
+
+	if (diff_x.get_ready()){
+//		printf("diff: %f, %f\n", (double)diff_x.get_latest(),(double)diff_y.get_latest() );
+//		_predicted_target_pose_x -= diff_x.get_latest();
+//		_predicted_target_pose_y -= diff_y.get_latest();
 	}
 
 	if(_target_pose_valid && _target_pose.abs_pos_valid){
@@ -311,11 +333,14 @@ PrecLand::run_state_horizontal_approach()
 		PX4_ERR("Can't switch to fallback landing");
 	}
 
-	slewrate(_predicted_target_pose_x, _predicted_target_pose_y);
+	float px = _predicted_target_pose_x; // + 1.f*powf(v_x.get_latest(),3);
+	float py = _predicted_target_pose_y; // + 1.f*powf(v_y.get_latest(),3);
+	slewrate(px, py);
+	std::cout << "x" << _predicted_target_pose_x << ", y " << _predicted_target_pose_y << "  x+v " << px << ", y+v " << py << std::endl;
 
 	// XXX need to transform to GPS coords because mc_pos_control only looks at that
 	double lat, lon;
-	map_projection_reproject(&_map_ref, _predicted_target_pose_x, _predicted_target_pose_y, &lat, &lon);
+	map_projection_reproject(&_map_ref, px, py, &lat, &lon);
 
 	pos_sp_triplet->current.lat = lat;
 	pos_sp_triplet->current.lon = lon;
@@ -539,7 +564,7 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		}
 
 		// If we're trying to switch to this state, the target needs to be visible
-		return _target_pose_updated && _target_pose_valid && _target_pose.abs_pos_valid;
+		return _target_pose_updated && _target_pose_valid && _target_pose.abs_pos_valid && v_x.get_ready();
 
 	case PrecLandState::DescendAboveTarget:
 
@@ -635,6 +660,7 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 	sp_x = sp_curr(0);
 	sp_y = sp_curr(1);
+//	std::cout << "v set:" << sp_x << ", " << sp_y << std::endl;
 }
 
 

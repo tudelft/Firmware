@@ -291,7 +291,7 @@ void LandingTargetEstimator::update()
 				orb_publish(ORB_ID(landing_target_pose), _targetPosePub, &_target_pose);
 			}
 
-			PX4_INFO("%f, %f vs %f. %f",(double)_target_pose.x_rel,(double)_target_pose.y_rel,(double)_target_pose.zero_x_rel,(double)_target_pose.zero_y_rel );
+//			PX4_INFO("%f, %f vs %f. %f",(double)_target_pose.x_rel,(double)_target_pose.y_rel,(double)_target_pose.zero_x_rel,(double)_target_pose.zero_y_rel );
 
 			_last_update = hrt_absolute_time();
 			_last_predict = _last_update;
