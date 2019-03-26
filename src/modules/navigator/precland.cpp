@@ -336,16 +336,32 @@ PrecLand::run_state_horizontal_approach()
 	float px = _predicted_target_pose_x; // + 1.f*powf(v_x.get_latest(),3);
 	float py = _predicted_target_pose_y; // + 1.f*powf(v_y.get_latest(),3);
 	slewrate(px, py);
-	std::cout << "x" << _predicted_target_pose_x << ", y " << _predicted_target_pose_y << "  x+v " << px << ", y+v " << py << std::endl;
+//	std::cout << "x" << _predicted_target_pose_x << ", y " << _predicted_target_pose_y << "  x+v " << px << ", y+v " << py << std::endl;
 
 	// XXX need to transform to GPS coords because mc_pos_control only looks at that
 	double lat, lon;
 	map_projection_reproject(&_map_ref, px, py, &lat, &lon);
 
-	pos_sp_triplet->current.lat = lat;
-	pos_sp_triplet->current.lon = lon;
-	pos_sp_triplet->current.alt = _approach_alt;
-	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+	if (v_x.get_ready() ) {
+		pos_sp_triplet->current.lat = lat;
+		pos_sp_triplet->current.lon = lon;
+		pos_sp_triplet->current.alt = _approach_alt;
+		pos_sp_triplet->current.vx = v_x.get_latest();
+		pos_sp_triplet->current.vy = v_y.get_latest();
+		pos_sp_triplet->current.vz = 0;
+		pos_sp_triplet->current.velocity_valid = true;
+		pos_sp_triplet->current.position_valid = false;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_VELOCITY;
+		std::cout << "v gaan we dan: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << std::endl;
+	} else {
+		pos_sp_triplet->current.lat = lat;
+		pos_sp_triplet->current.lon = lon;
+		pos_sp_triplet->current.alt = _approach_alt;
+		pos_sp_triplet->current.velocity_valid = false;
+		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+	}
+
 
 	_navigator->set_position_setpoint_triplet_updated();
 }
