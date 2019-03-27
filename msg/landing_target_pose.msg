@@ -22,3 +22,31 @@ bool abs_pos_valid		# Flag showing whether absolute position is valid
 float32 x_abs			# X/north position of target, relative to origin (navigation frame) [meters]
 float32 y_abs			# Y/east position of target, relative to origin (navigation frame) [meters]
 float32 z_abs			# Z/down position of target, relative to origin (navigation frame) [meters]
+
+
+
+
+
+float32 raw_angle				#raw angle, how close is the marker to the border of the image
+
+
+bool zero_rel_pos_valid		# Flag showing whether relative position is valid
+bool zero_rel_vel_valid		# Flag showing whether relative velocity is valid
+
+float32 zero_x_rel			# X/north position of target, relative to vehicle (navigation frame) [meters]
+float32 zero_y_rel			# Y/east position of target, relative to vehicle (navigation frame) [meters]
+float32 zero_z_rel			# Z/down position of target, relative to vehicle (navigation frame) [meters]
+
+float32 zero_vx_rel			# X/north velocity  of target, relative to vehicle (navigation frame) [meters/second]
+float32 zero_vy_rel			# Y/east velocity of target, relative to vehicle (navigation frame) [meters/second]
+
+float32 zero_cov_x_rel		# X/north position variance [meters^2]
+float32 zero_cov_y_rel		# Y/east position variance [meters^2]
+
+float32 zero_cov_vx_rel		# X/north velocity variance [(meters/second)^2]
+float32 zero_cov_vy_rel		# Y/east velocity variance [(meters/second)^2]
+
+bool zero_abs_pos_valid		# Flag showing whether absolute position is valid
+float32 zero_x_abs			# X/north position of target, relative to origin (navigation frame) [meters]
+float32 zero_y_abs			# Y/east position of target, relative to origin (navigation frame) [meters]
+float32 zero_z_abs			# Z/down position of target, relative to origin (navigation frame) [meters]
