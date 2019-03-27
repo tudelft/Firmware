@@ -1437,7 +1437,8 @@ MulticopterPositionControl::control_non_manual()
 
 		_vel_sp(0) = fabsf(ft_vel(0)) > fabsf(_vel_sp(0)) ? ft_vel(0) : _vel_sp(0);
 		_vel_sp(1) = fabsf(ft_vel(1)) > fabsf(_vel_sp(1)) ? ft_vel(1) : _vel_sp(1);
-
+		PX4_INFO("vel sp: %f, %f, enabled: %d", (double)_vel_sp(0),(double)_vel_sp(1),_control_mode.flag_control_velocity_enabled);
+//_run_pos_control = false;
 		// track target using velocity only
 
 	} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET &&
@@ -1445,6 +1446,8 @@ MulticopterPositionControl::control_non_manual()
 
 		_vel_sp(0) = _pos_sp_triplet.current.vx;
 		_vel_sp(1) = _pos_sp_triplet.current.vy;
+		PX4_INFO("vel ONLY sp: %f, %f", (double)_vel_sp(0),(double)_vel_sp(1));
+//_run_pos_control = false;
 	}
 
 	/* use constant descend rate when landing, ignore altitude setpoint */
@@ -1809,6 +1812,15 @@ void MulticopterPositionControl::control_auto()
 		if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION  ||
 		    _pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER ||
 		    _pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET) {
+
+
+			if (_pos_sp_triplet.current.velocity_valid){
+				_control_mode.flag_control_velocity_enabled = true;
+				_control_mode.flag_control_position_enabled = false;
+			} else {
+				_control_mode.flag_control_velocity_enabled = false;
+				_control_mode.flag_control_position_enabled = true;
+			}
 
 			/* by default use current setpoint as is */
 			matrix::Vector3f pos_sp = _curr_pos_sp;
@@ -2366,8 +2378,13 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 
 		// If for any reason, we get a NaN position setpoint, we better just stay where we are.
 		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1))) {
-			_vel_sp(0) = (_pos_sp(0) - _pos(0)) * _pos_p(0);
-			_vel_sp(1) = (_pos_sp(1) - _pos(1)) * _pos_p(1);
+			if (_pos_sp_triplet.current.velocity_valid) {
+				_vel_sp(0) += (_pos_sp(0) - _pos(0)) * _pos_p(0);
+				_vel_sp(1) += (_pos_sp(1) - _pos(1)) * _pos_p(1);
+			} else {
+				_vel_sp(0) = (_pos_sp(0) - _pos(0)) * _pos_p(0);
+				_vel_sp(1) = (_pos_sp(1) - _pos(1)) * _pos_p(1);
+			}
 
 		} else {
 			_vel_sp(0) = 0.0f;

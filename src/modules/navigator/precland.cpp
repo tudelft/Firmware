@@ -54,6 +54,7 @@
 #include <uORB/topics/position_setpoint_triplet.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_command.h>
+#include <uORB/topics/vehicle_control_mode.h>
 
 #define SEC2USEC 1000000.0f
 
@@ -174,7 +175,7 @@ void PrecLand::predict_target() {
 	uint64_t now = hrt_absolute_time();
 	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
 	dt /= SEC2USEC;
-	if(_target_pose_valid && _target_pose.abs_pos_valid ){
+	if(_target_pose_valid && _target_pose.rel_vel_valid ){
 		if (v_prev_initialised){
 			vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 			v_x.addSample(_target_pose.vx_rel + vehicle_local_position->vx);
@@ -350,16 +351,22 @@ PrecLand::run_state_horizontal_approach()
 		pos_sp_triplet->current.vy = v_y.get_latest();
 		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.velocity_valid = true;
-		pos_sp_triplet->current.position_valid = false;
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_VELOCITY;
+
+//		vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+
+//		if (fabs(vehicle_local_position->vx)>0.05f && fabs(vehicle_local_position->vy ) > 0.05f)
+			pos_sp_triplet->current.position_valid = false;
+//		else
+//			pos_sp_triplet->current.position_valid = false;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
 		std::cout << "v gaan we dan: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << std::endl;
 	} else {
-		pos_sp_triplet->current.lat = lat;
-		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.alt = _approach_alt;
-		pos_sp_triplet->current.velocity_valid = false;
-		pos_sp_triplet->current.position_valid = true;
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+//		pos_sp_triplet->current.lat = lat;
+//		pos_sp_triplet->current.lon = lon;
+//		pos_sp_triplet->current.alt = _approach_alt;
+//		pos_sp_triplet->current.velocity_valid = false;
+//		pos_sp_triplet->current.position_valid = true;
+//		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 	}
 
 
