@@ -48,7 +48,7 @@
 #include "navigator_mode.h"
 #include "mission_block.h"
 
-#include <iostream>
+//#include <iostream>
 #include <vector>
 
 
@@ -62,7 +62,7 @@ class Smoother
 {
 
   private:
-	std::vector<float> _rbuf; // rotary buffer
+	matrix::Vector<float,1000> _rbuf; // rotary buffer
 	int _kernelsize;          // filter kernel width
 	int _rotater;             //pointer to current sample in rotary buffer
 	float _runner;            // current filter output value

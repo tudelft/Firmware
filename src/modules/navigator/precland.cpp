@@ -683,14 +683,16 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 void Smoother::init(int width, float value)
 {
+	if (width > 1000)
+		width = 1000;
 	_kernelsize = width;
-	_rbuf.resize(_kernelsize + 1);
+//	_rbuf.resize(_kernelsize + 1);
 	_rotater = 0;
 	_runner = value*_kernelsize;
 
 	for (int i = 0; i <= _kernelsize; i++)
 	{
-		_rbuf.at(i) = value;
+		_rbuf(i) = value;
 	}
 }
 
@@ -704,7 +706,7 @@ void Smoother::reset()
 	_rotater = 0;
 	for (int i = 0; i <= _kernelsize; i++)
 	{
-		_rbuf.at(i) = 0;
+		_rbuf(i) = 0;
 	}
 	_runner = 0;
 	_ready = false;
@@ -714,7 +716,7 @@ void Smoother::reset_to(float v)
 	_rotater = 0;
 	for (int i = 0; i <= _kernelsize; i++)
 	{
-		_rbuf.at(i) = v;
+		_rbuf(i) = v;
 	}
 	_runner = v*_kernelsize;
 	_ready = true;
@@ -724,16 +726,16 @@ float Smoother::addSample(float sample)
 {
 	//performs online smoothing filter
 
-	if (isnanf(sample)) // fixes nan, which forever destroy the output
+	if (isnan(sample)) // fixes nan, which forever destroy the output
 		sample = 0;
 	if (_kernelsize == 1)
 	{ // disable smoothing... to be sure:
 		return sample;
 	}
 
-	_rbuf.at(_rotater) = sample;                     // overwrite oldest sample in the roundtrip buffer
+	_rbuf(_rotater) = sample;                     // overwrite oldest sample in the roundtrip buffer
 	_rotater = (_rotater + 1) % (_kernelsize + 1);   //update pointer to buffer
-	_runner = _runner + sample - _rbuf.at(_rotater); //add new sample, subtract the new oldest sample
+	_runner = _runner + sample - _rbuf(_rotater); //add new sample, subtract the new oldest sample
 
 	if (!_ready)
 	{ // check if completely filled
