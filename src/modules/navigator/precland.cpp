@@ -57,7 +57,7 @@
 
 #define SEC2USEC 1000000.0f
 
-#define STATE_TIMEOUT 10000000 // [us] Maximum time to spend in any state
+#define STATE_TIMEOUT 100000000 // [us] Maximum time to spend in any state
 
 PrecLand::PrecLand(Navigator *navigator) :
 	MissionBlock(navigator),
