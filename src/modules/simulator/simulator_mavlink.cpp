@@ -440,7 +440,6 @@ void Simulator::handle_message(mavlink_message_t *msg, bool publish)
 		report.size_x = landing_target_mavlink.size_x;
 		report.size_y = landing_target_mavlink.size_y;
 
-		//printf("mavl sim: %f, %f\n",(double)report.pos_x,(double)report.pos_y);
 		int irlock_multi;
 		orb_publish_auto(ORB_ID(irlock_report), &_irlock_report_pub, &report, &irlock_multi, ORB_PRIO_HIGH);
 

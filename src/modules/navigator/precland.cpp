@@ -56,6 +56,8 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 
+//#include <iostream>
+
 #define SEC2USEC 1000000.0f
 
 #define STATE_TIMEOUT 100000000 // [us] Maximum time to spend in any state
@@ -181,7 +183,7 @@ void PrecLand::predict_target() {
 			v_x.addSample(_target_pose.vx_rel + vehicle_local_position->vx);
 			v_y.addSample(_target_pose.vy_rel + vehicle_local_position->vy);
 		}
-		std::cout << "v : " << v_x.get_latest() << ", "<< v_y.get_latest() << " dt " << dt << " posy " << _target_pose.y_abs << " dy " << _target_pose.y_abs-last_good_target_pose_y << std::endl;
+//		std::cout << "v : " << v_x.get_latest() << ", "<< v_y.get_latest() << " dt " << dt << " posy " << _target_pose.y_abs << " dy " << _target_pose.y_abs-last_good_target_pose_y << std::endl;
 
 		float ls;
 		ls = _target_pose.raw_angle*0.7f; // todo: 0.7 -> use land speed param
@@ -190,9 +192,6 @@ void PrecLand::predict_target() {
 		else if (ls<0.05f)
 			ls = 0.05f;
 		land_speed.addSample(ls);
-
-		//		PX4_INFO("_target_pose.raw_angle: %f",
-		//				 static_cast<double>(land_speed.get_latest()));
 	} else {
 		land_speed.addSample(0.05);
 	}
@@ -343,7 +342,12 @@ PrecLand::run_state_horizontal_approach()
 	double lat, lon;
 	map_projection_reproject(&_map_ref, px, py, &lat, &lon);
 
-	if (v_x.get_ready() ) {
+	uint64_t now = hrt_absolute_time();
+	float time_since_last_sighting = (now - last_good_target_pose_time);
+	time_since_last_sighting /= SEC2USEC;
+	float v = sqrtf(powf(v_x.get_latest(),2) + powf(v_y.get_latest(),2));
+
+	if (v_x.get_ready() && time_since_last_sighting < 10 && v > 1.f) {
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
 		pos_sp_triplet->current.alt = _approach_alt;
@@ -352,21 +356,23 @@ PrecLand::run_state_horizontal_approach()
 		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.velocity_valid = true;
 
-//		vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-
 //		if (fabs(vehicle_local_position->vx)>0.05f && fabs(vehicle_local_position->vy ) > 0.05f)
-			pos_sp_triplet->current.position_valid = false;
+			pos_sp_triplet->current.position_valid = true;
 //		else
-//			pos_sp_triplet->current.position_valid = false;
+		pos_sp_triplet->current.position_valid = false;
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
-		std::cout << "v gaan we dan: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << std::endl;
+		//PX4_INFO("Follow: %f, %f. Last sighting: %f",(double)pos_sp_triplet->current.vx,(double)pos_sp_triplet->current.vy,(double)time_since_last_sighting);
+//		std::cout << "Follow: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << "last sighting: " << time_since_last_sighting << std::endl;
+
 	} else {
-//		pos_sp_triplet->current.lat = lat;
-//		pos_sp_triplet->current.lon = lon;
-//		pos_sp_triplet->current.alt = _approach_alt;
-//		pos_sp_triplet->current.velocity_valid = false;
-//		pos_sp_triplet->current.position_valid = true;
-//		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->current.lat = lat;
+		pos_sp_triplet->current.lon = lon;
+		pos_sp_triplet->current.alt = _approach_alt;
+		pos_sp_triplet->current.velocity_valid = false;
+		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+//		std::cout << "Position: " << lat << ", " << lon <<  std::endl;
+		//PX4_INFO("Position: %f, %f.",(double)pos_sp_triplet->current.vx,(double)pos_sp_triplet->current.vy);
 	}
 
 
@@ -683,7 +689,6 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 	sp_x = sp_curr(0);
 	sp_y = sp_curr(1);
-//	std::cout << "v set:" << sp_x << ", " << sp_y << std::endl;
 }
 
 

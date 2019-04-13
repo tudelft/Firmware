@@ -48,7 +48,6 @@
 #include "navigator_mode.h"
 #include "mission_block.h"
 
-//#include <iostream>
 #include <vector>
 
 
