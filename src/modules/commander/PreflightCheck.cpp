@@ -518,7 +518,7 @@ static bool powerCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status, 
 						mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: Avionics power low: %6.2f Volt", (double)avionics_power_rail_voltage);
 					}
 
-				} else if (avionics_power_rail_voltage < 4.9f) {
+				} else if (avionics_power_rail_voltage < 4.80f) {
 					if (report_fail) {
 						mavlink_log_critical(mavlink_log_pub, "CAUTION: Avionics power low: %6.2f Volt", (double)avionics_power_rail_voltage);
 					}
@@ -896,7 +896,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, vehicle_status_s &status,
 			}
 
 			failed = true;
-			
+
 			set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, status_flags.rc_signal_found_once, true, false, status);
 			status_flags.rc_calibration_valid = false;
 		} else {
