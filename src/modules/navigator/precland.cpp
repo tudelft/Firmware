@@ -182,14 +182,14 @@ void PrecLand::predict_target() {
 			vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 			v_x.addSample(_target_pose.vx_rel + vehicle_local_position->vx);
 			v_y.addSample(_target_pose.vy_rel + vehicle_local_position->vy);
-			float tv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vy_rel,2));
-			float vv = sqrtf(powf(vehicle_local_position->vx,2) + powf(vehicle_local_position->vy,2));
-			float gv = sqrtf(powf(v_x.get_latest(),2) + powf(v_y.get_latest(),2));
+//			float tv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vy_rel,2));
+//			float vv = sqrtf(powf(vehicle_local_position->vx,2) + powf(vehicle_local_position->vy,2));
+//			float gv = sqrtf(powf(v_x.get_latest(),2) + powf(v_y.get_latest(),2));
 //			std::cout << "tv: " << tv << " x: " << _target_pose.vx_rel << " y: " << _target_pose.vy_rel << " --- vv: " << vv << " x: " << vehicle_local_position->vx << " y: " << vehicle_local_position->vy << std::endl;
 //			std::cout << "tv: " << tv << " vv: " << vv << " gv: " << gv << std::endl;
 
 
-			std::cout << "tv: " << tv << " vv: " << vv << " gv: " << gv << " tvx: " << _target_pose.vx_rel << " tvy: " << _target_pose.vy_rel << " --- " << " vx: " << vehicle_local_position->vx << " vy: " << vehicle_local_position->vy << std::endl;
+//			std::cout << "tv: " << tv << " vv: " << vv << " gv: " << gv << " tvx: " << _target_pose.vx_rel << " tvy: " << _target_pose.vy_rel << " --- " << " vx: " << vehicle_local_position->vx << " vy: " << vehicle_local_position->vy << std::endl;
 
 		}
 //		std::cout << "v : " << v_x.get_latest() << ", "<< v_y.get_latest() << " dt " << dt << " posy " << _target_pose.y_abs << " dy " << _target_pose.y_abs-last_good_target_pose_y << std::endl;
@@ -290,7 +290,7 @@ PrecLand::run_state_start()
 	}
 }
 
-void PrecLand::update_postriplet(float px, float py){
+void PrecLand::update_postriplet(float px, float py, bool land){
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	double lat, lon;
 	map_projection_reproject(&_map_ref, px, py, &lat, &lon);
@@ -298,12 +298,10 @@ void PrecLand::update_postriplet(float px, float py){
 	uint64_t now = hrt_absolute_time();
 	float time_since_last_sighting = (now - last_good_target_pose_time);
 	time_since_last_sighting /= SEC2USEC;
-	float v = sqrtf(powf(v_x.get_latest(),2) + powf(v_y.get_latest(),2));
 
 	if (v_x.get_ready() && time_since_last_sighting < 10 ) {
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.alt = _approach_alt;
 		pos_sp_triplet->current.vx = v_x.get_latest();
 		pos_sp_triplet->current.vy = v_y.get_latest();
 		pos_sp_triplet->current.vz = 0;
@@ -311,22 +309,17 @@ void PrecLand::update_postriplet(float px, float py){
 		pos_sp_triplet->current.position_valid = true;
 
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
-		std::cout << "Follow: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << " |v| " << v << " last sighting: " << time_since_last_sighting << std::endl;
+		//std::cout << "Follow: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << " |v| " << v << " last sighting: " << time_since_last_sighting << std::endl;
 
 	} else if (time_since_last_sighting > 10){
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.alt = _approach_alt;
 		pos_sp_triplet->current.velocity_valid = false;
 		pos_sp_triplet->current.position_valid = true;
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 		PX4_WARN("Holding Position: %f, %f because last sighting: %f", static_cast<double>(lat) , static_cast<double>(lon),static_cast<double>(time_since_last_sighting) );
 		//todo: use other means to find the boat?
 	}
-
-	//disable velocity control if marker speed < 1 m/s, because position control can handle that:
-	if (v < 1.f) //todo: test if this is actually usefull?
-		pos_sp_triplet->current.velocity_valid = false;
 
 	if (pos_sp_triplet->current.velocity_valid && time_since_last_sighting < 10 ) {
 		//if velocity control is enabled, disable position control unless the drone is in a small specific zone behind the marker, chasing the marker:
@@ -339,6 +332,14 @@ void PrecLand::update_postriplet(float px, float py){
 	pos_sp_triplet->next.valid = false;
 	pos_sp_triplet->current.yawspeed_valid = false;
 //		pos_sp_triplet->current.yawspeed = yaw_rate;
+
+	if (land) {
+		pos_sp_triplet->current.vz = land_speed.get_latest();
+		pos_sp_triplet->current.alt_valid = false;
+	} else {
+		pos_sp_triplet->current.alt = _approach_alt;
+		pos_sp_triplet->current.alt_valid = true;
+	}
 
 	_navigator->set_position_setpoint_triplet_updated();
 }
@@ -398,8 +399,7 @@ PrecLand::run_state_horizontal_approach()
 	float px = _predicted_target_pose_x; // + 1.f*powf(v_x.get_latest(),3);
 	float py = _predicted_target_pose_y; // + 1.f*powf(v_y.get_latest(),3);
 	slewrate(px, py);
-	update_postriplet(px,py);
-
+	update_postriplet(px,py,false);
 }
 
 
@@ -428,24 +428,14 @@ PrecLand::run_state_descend_above_target()
 		return;
 	}
 
-	// XXX need to transform to GPS coords because mc_pos_control only looks at that
-	double lat, lon;
-	map_projection_reproject(&_map_ref, _predicted_target_pose_x, _predicted_target_pose_y, &lat, &lon);
-
-	pos_sp_triplet->current.lat = lat;
-	pos_sp_triplet->current.lon = lon;
-
-	pos_sp_triplet->current.vz = land_speed.get_latest();
-
-	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
-
-	_navigator->set_position_setpoint_triplet_updated();
+	update_postriplet(_predicted_target_pose_x, _predicted_target_pose_y,true);
 }
 
 void
 PrecLand::run_state_final_approach()
 {
 	// nothing to do, will land
+	update_postriplet(_predicted_target_pose_x, _predicted_target_pose_y,true);
 }
 
 void
@@ -589,6 +579,14 @@ PrecLand::switch_to_state_done()
 	return true;
 }
 
+float PrecLand::acceptance_range() {
+	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+	float acceptance_range = _param_hacc_rad.get() * vehicle_local_position->ref_alt/3.f;
+	if (acceptance_range < _param_hacc_rad.get())
+		acceptance_range  = _param_hacc_rad.get();
+	return acceptance_range;
+}
+
 bool PrecLand::check_state_conditions(PrecLandState state)
 {
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
@@ -598,11 +596,10 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		return _search_cnt <= _param_max_searches.get();
 
 	case PrecLandState::HorizontalApproach:
-
 		// if we're already in this state, only want to make it invalid if we reached the target but can't see it anymore
 		if (_state == PrecLandState::HorizontalApproach) {
-			if (fabsf(_predicted_target_pose_x - vehicle_local_position->x) < _param_hacc_rad.get()
-					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < _param_hacc_rad.get()) {
+			if (fabsf(_predicted_target_pose_x - vehicle_local_position->x) < acceptance_range()
+					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < acceptance_range()) {
 				// we've reached the position where we predicted we'd see the target. If we don't see it now, we may need to do something
 
 				//continue to go to the prediction (but only if available -> filter is ready) until the timeout, or if we actually see the target now
@@ -634,8 +631,8 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		} else {
 			// if not already in this state, need to be above target to enter it
 			return _target_pose_updated && _target_pose.abs_pos_valid
-					&& fabsf(_predicted_target_pose_x - vehicle_local_position->x) < _param_hacc_rad.get()
-					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < _param_hacc_rad.get();
+					&& fabsf(_predicted_target_pose_x - vehicle_local_position->x) < acceptance_range()
+					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < acceptance_range();
 		}
 
 	case PrecLandState::FinalApproach:

@@ -122,7 +122,8 @@ private:
 	void run_state_search();
 	void run_state_fallback();
 
-	void update_postriplet(float px, float py);
+	void update_postriplet(float px, float py, bool land);
+	float acceptance_range();
 
 	// attempt to switch to a different state. Returns true if state change was successful, false otherwise
 	bool switch_to_state_start();

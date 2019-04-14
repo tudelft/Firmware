@@ -1442,10 +1442,14 @@ MulticopterPositionControl::control_non_manual()
 		_vel_sp(1) = _pos_sp_triplet.current.vy;
 		_run_pos_vel_control = true;
 
+		if (!_pos_sp_triplet.current.alt_valid) { //landing
+			_vel_sp(2) = _land_speed.get();
+			_run_alt_control = false;
+		}
+
 			// track target using velocity only
 	} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET &&
 		   velocity_valid) {
-
 		_vel_sp(0) = _pos_sp_triplet.current.vx;
 		_vel_sp(1) = _pos_sp_triplet.current.vy;
 		_run_pos_vel_control = true;
@@ -2368,16 +2372,16 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 {
 	if (_run_pos_vel_control) {
 		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1)) && _pos_sp_triplet.current.position_valid) {
-			PX4_INFO("Vel + pos control!");
+//			PX4_INFO("Vel + pos control!");
 			_vel_sp(0) += (_pos_sp(0) - _pos(0)) * _pos_p(0);
 			_vel_sp(1) += (_pos_sp(1) - _pos(1)) * _pos_p(1);
 		} else {
-			PX4_INFO("Vel ONLY control!");
+//			PX4_INFO("Vel ONLY control!");
 		}
 
 		/* run position & altitude controllers, if enabled (otherwise use already computed velocity setpoints) */
 	} else if (_run_pos_control) {
-		PX4_INFO("Static Pos control");
+//		PX4_INFO("Static Pos control");
 
 		// If for any reason, we get a NaN position setpoint, we better just stay where we are.
 		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1))) {
