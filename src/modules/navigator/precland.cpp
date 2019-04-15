@@ -314,6 +314,8 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	} else if (time_since_last_sighting > 10){
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
+		pos_sp_triplet->current.vx = 0;
+		pos_sp_triplet->current.vy = 0;
 		pos_sp_triplet->current.velocity_valid = false;
 		pos_sp_triplet->current.position_valid = true;
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
