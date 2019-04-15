@@ -2379,6 +2379,20 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 //			PX4_INFO("Vel ONLY control!");
 		}
 
+		if (!PX4_ISFINITE(_vel_sp(0)))
+			_vel_sp(0) = 0;
+		else if (_vel_sp(0)>5)
+			_vel_sp(0) = 5;
+		else if (_vel_sp(0)<-5)
+			_vel_sp(0) = -5;
+		if (!PX4_ISFINITE(_vel_sp(1)))
+			_vel_sp(1) = 0;
+		else if (_vel_sp(1)>5)
+			_vel_sp(1) = 5;
+		else if (_vel_sp(1)<-5)
+			_vel_sp(1) = -5;
+
+
 		/* run position & altitude controllers, if enabled (otherwise use already computed velocity setpoints) */
 	} else if (_run_pos_control) {
 //		PX4_INFO("Static Pos control");
