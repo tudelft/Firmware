@@ -486,6 +486,14 @@ PrecLand::switch_to_state_start()
 	if (check_state_conditions(PrecLandState::Start)) {
 		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
+		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
+		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+		pos_sp_triplet->current.alt_valid = true;
+		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.velocity_valid = false;
+		pos_sp_triplet->current.vx = 0;
+		pos_sp_triplet->current.vy = 0;
 		_navigator->set_position_setpoint_triplet_updated();
 		_search_cnt++;
 
@@ -548,6 +556,14 @@ PrecLand::switch_to_state_search()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	pos_sp_triplet->current.alt = vehicle_local_position->ref_alt + _param_search_alt.get();
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+	pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
+	pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
+	pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+	pos_sp_triplet->current.alt_valid = true;
+	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.velocity_valid = false;
+	pos_sp_triplet->current.vx = 0;
+	pos_sp_triplet->current.vy = 0;
 	_navigator->set_position_setpoint_triplet_updated();
 
 	_target_acquired_time = 0;
