@@ -56,7 +56,7 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 
-#include <iostream>
+//#include <iostream>
 
 #define SEC2USEC 1000000.0f
 
