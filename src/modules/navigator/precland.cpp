@@ -781,6 +781,8 @@ float Smoother::addSample(float sample)
 		sample = 0;
 	if (_kernelsize == 1)
 	{ // disable smoothing... to be sure:
+		_ready = true;
+		_runner = sample;
 		return sample;
 	}
 
