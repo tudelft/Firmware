@@ -140,8 +140,6 @@ private:
 	void predict_target();
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
-	float _predicted_target_pose_x;
-	float _predicted_target_pose_y;
 
 	int _target_pose_sub{-1};
 	bool _target_pose_valid{false}; /**< whether we have received a landing target position message */
@@ -160,7 +158,7 @@ private:
 	matrix::Vector2f _sp_pev;
 	matrix::Vector2f _sp_pev_prev;
 
-	Smoother v_x,v_y,land_speed,diff_x,diff_y;
+	Smoother land_speed;
 	float last_good_target_pose_x;
 	float last_good_target_pose_y;
 	uint64_t last_good_target_pose_time;

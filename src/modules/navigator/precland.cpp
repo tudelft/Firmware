@@ -71,10 +71,6 @@ PrecLand::PrecLand(Navigator *navigator) :
 void
 PrecLand::on_activation()
 {
-	v_x.init(_param_smt_wdt.get());
-	v_y.init(_param_smt_wdt.get());
-	diff_x.init(100);
-	diff_y.init(100);
 	land_speed.init(5,0.1f);
 	v_prev_initialised = false;
 
@@ -178,21 +174,8 @@ void PrecLand::predict_target() {
 	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
 	dt /= SEC2USEC;
 	if(_target_pose_valid && _target_pose.rel_vel_valid ){
-		if (v_prev_initialised){
-			vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-			v_x.addSample(_target_pose.vx_rel + vehicle_local_position->vx);
-			v_y.addSample(_target_pose.vy_rel + vehicle_local_position->vy);
-//			float tv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vy_rel,2));
-//			float vv = sqrtf(powf(vehicle_local_position->vx,2) + powf(vehicle_local_position->vy,2));
-//			float gv = sqrtf(powf(v_x.get_latest(),2) + powf(v_y.get_latest(),2));
-//			std::cout << "tv: " << tv << " x: " << _target_pose.vx_rel << " y: " << _target_pose.vy_rel << " --- vv: " << vv << " x: " << vehicle_local_position->vx << " y: " << vehicle_local_position->vy << std::endl;
-//			std::cout << "tv: " << tv << " vv: " << vv << " gv: " << gv << std::endl;
 
 
-//			std::cout << "tv: " << tv << " vv: " << vv << " gv: " << gv << " tvx: " << _target_pose.vx_rel << " tvy: " << _target_pose.vy_rel << " --- " << " vx: " << vehicle_local_position->vx << " vy: " << vehicle_local_position->vy << std::endl;
-
-		}
-//		std::cout << "v : " << v_x.get_latest() << ", "<< v_y.get_latest() << " dt " << dt << " posy " << _target_pose.y_abs << " dy " << _target_pose.y_abs-last_good_target_pose_y << std::endl;
 
 		float ls;
 		ls = _target_pose.raw_angle*0.7f; // todo: 0.7 -> use land speed param
@@ -203,39 +186,6 @@ void PrecLand::predict_target() {
 		land_speed.addSample(ls);
 	} else {
 		land_speed.addSample(0.05);
-	}
-
-	if(v_x.get_ready()){ // do we have enough data to predict?
-		_predicted_target_pose_x = last_good_target_pose_x + dt * v_x.get_latest();
-		_predicted_target_pose_y = last_good_target_pose_y + dt * v_y.get_latest();
-		//		PX4_INFO("Measured: %f, %f. Predicted: %f, %f. dt: %f . Recommended landspeed: %f",
-		//				 static_cast<double>(last_good_target_pose_x),
-		//				 static_cast<double>(last_good_target_pose_y),
-		//				 static_cast<double>(_predicted_target_pose_x),
-		//				 static_cast<double>(_predicted_target_pose_y),
-		//				 static_cast<double>(dt),
-		//				 static_cast<double>(land_speed.get_latest()));
-
-		vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-		if(_target_pose_valid && _target_pose.abs_pos_valid && (fabsf(v_x.get_latest() - vehicle_local_position->vx) < 0.2f) && (fabsf(v_y.get_latest() - vehicle_local_position->vy) < 0.2f)){
-			diff_x.addSample(_target_pose.x_rel - _target_pose.zero_x_rel);
-			diff_y.addSample(_target_pose.y_rel - _target_pose.zero_y_rel);
-//			printf("v diff: %f, %f\n", (double)fabs(v_x.get_latest() - vehicle_local_position->vx),(double)fabs(v_y.get_latest() - vehicle_local_position->vy));
-		} else {
-			diff_x.addSample(0);
-			diff_y.addSample(0);
-		}
-
-
-	} else if(_target_pose_valid && _target_pose.abs_pos_valid){ // if we cannot predict yet, use the acutal sighted position of the target
-		_predicted_target_pose_x = _target_pose.x_abs;
-		_predicted_target_pose_y = _target_pose.y_abs;
-	}
-
-	if (diff_x.get_ready()){
-//		printf("diff: %f, %f\n", (double)diff_x.get_latest(),(double)diff_y.get_latest() );
-//		_predicted_target_pose_x -= diff_x.get_latest();
-//		_predicted_target_pose_y -= diff_y.get_latest();
 	}
 
 	if(_target_pose_valid && _target_pose.abs_pos_valid){
@@ -299,11 +249,13 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	float time_since_last_sighting = (now - last_good_target_pose_time);
 	time_since_last_sighting /= SEC2USEC;
 
-	if (v_x.get_ready() && time_since_last_sighting < 10 ) {
+	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+
+	if (time_since_last_sighting < 10 ) {
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.vx = v_x.get_latest();
-		pos_sp_triplet->current.vy = v_y.get_latest();
+		pos_sp_triplet->current.vx = _target_pose.vx_rel + vehicle_local_position->vx;
+		pos_sp_triplet->current.vy = _target_pose.vy_rel + vehicle_local_position->vy;
 		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.velocity_valid = true;
 		pos_sp_triplet->current.position_valid = true;
@@ -402,8 +354,8 @@ PrecLand::run_state_horizontal_approach()
 		PX4_ERR("Can't switch to fallback landing");
 	}
 
-	float px = _predicted_target_pose_x; // + 1.f*powf(v_x.get_latest(),3);
-	float py = _predicted_target_pose_y; // + 1.f*powf(v_y.get_latest(),3);
+	float px = _target_pose.x_abs; // + 1.f*powf(v_x.get_latest(),3);
+	float py = _target_pose.y_abs; // + 1.f*powf(v_y.get_latest(),3);
 	//slewrate(px, py);
 	update_postriplet(px,py,false);
 }
@@ -433,14 +385,14 @@ PrecLand::run_state_descend_above_target()
 		return;
 	}
 
-	update_postriplet(_predicted_target_pose_x, _predicted_target_pose_y,true);
+	update_postriplet(_target_pose.x_abs, _target_pose.y_abs,true);
 }
 
 void
 PrecLand::run_state_final_approach()
 {
 	// nothing to do, will land
-	update_postriplet(_predicted_target_pose_x, _predicted_target_pose_y,true);
+	update_postriplet(_target_pose.x_abs, _target_pose.y_abs,true);
 }
 
 void
@@ -607,12 +559,12 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 	case PrecLandState::HorizontalApproach:
 		// if we're already in this state, only want to make it invalid if we reached the target but can't see it anymore
 		if (_state == PrecLandState::HorizontalApproach) {
-			if (fabsf(_predicted_target_pose_x - vehicle_local_position->x) < acceptance_range()
-					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < acceptance_range()) {
+			if (fabsf(_target_pose.x_abs - vehicle_local_position->x) < acceptance_range()
+					&& fabsf(_target_pose.x_abs - vehicle_local_position->y) < acceptance_range()) {
 				// we've reached the position where we predicted we'd see the target. If we don't see it now, we may need to do something
 
 				//continue to go to the prediction (but only if available -> filter is ready) until the timeout, or if we actually see the target now
-				return ((v_x.get_ready() && last_good_target_pose_time - hrt_absolute_time() < static_cast<uint32_t>(_param_flw_tout.get())) ||
+				return ((_target_pose.rel_vel_valid && last_good_target_pose_time - hrt_absolute_time() < static_cast<uint32_t>(_param_flw_tout.get())) ||
 					(_target_pose_valid && _target_pose.abs_pos_valid));
 
 			} else {
@@ -623,7 +575,7 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		}
 
 		// If we're trying to switch to this state, the target needs to be visible
-		return _target_pose_updated && _target_pose_valid && _target_pose.abs_pos_valid && v_x.get_ready();
+		return _target_pose_updated && _target_pose_valid && _target_pose.abs_pos_valid && _target_pose.rel_vel_valid;
 
 	case PrecLandState::DescendAboveTarget:
 
@@ -640,10 +592,8 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		} else {
 			// if not already in this state, need to be above target to enter it
 			bool v =  _target_pose_updated && _target_pose.abs_pos_valid
-					&& fabsf(_predicted_target_pose_x - vehicle_local_position->x) < acceptance_range()
-					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < acceptance_range();
-			if (v)
-				PX4_ERR("Switching to descend!");
+					&& fabsf(_target_pose.x_abs - vehicle_local_position->x) < acceptance_range()
+					&& fabsf(_target_pose.y_abs - vehicle_local_position->y) < acceptance_range();
 			return v;
 		}
 
