@@ -335,6 +335,10 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	pos_sp_triplet->current.yawspeed_valid = false;
 //		pos_sp_triplet->current.yawspeed = yaw_rate;
 
+	if (!pos_sp_triplet->current.velocity_valid && -_navigator->get_local_position()->z  < 10){
+		land = false;
+	}
+
 	if (land) {
 		pos_sp_triplet->current.vz = land_speed.get_latest();
 		pos_sp_triplet->current.alt_valid = false;
@@ -400,10 +404,9 @@ PrecLand::run_state_horizontal_approach()
 
 	float px = _predicted_target_pose_x; // + 1.f*powf(v_x.get_latest(),3);
 	float py = _predicted_target_pose_y; // + 1.f*powf(v_y.get_latest(),3);
-	slewrate(px, py);
+	//slewrate(px, py);
 	update_postriplet(px,py,false);
 }
-
 
 void
 PrecLand::run_state_descend_above_target()
@@ -486,14 +489,6 @@ PrecLand::switch_to_state_start()
 	if (check_state_conditions(PrecLandState::Start)) {
 		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
-		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
-		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
-		pos_sp_triplet->current.alt_valid = true;
-		pos_sp_triplet->current.position_valid = true;
-		pos_sp_triplet->current.velocity_valid = false;
-		pos_sp_triplet->current.vx = 0;
-		pos_sp_triplet->current.vy = 0;
 		_navigator->set_position_setpoint_triplet_updated();
 		_search_cnt++;
 
@@ -556,14 +551,6 @@ PrecLand::switch_to_state_search()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	pos_sp_triplet->current.alt = vehicle_local_position->ref_alt + _param_search_alt.get();
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-	pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
-	pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
-	pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
-	pos_sp_triplet->current.alt_valid = true;
-	pos_sp_triplet->current.position_valid = true;
-	pos_sp_triplet->current.velocity_valid = false;
-	pos_sp_triplet->current.vx = 0;
-	pos_sp_triplet->current.vy = 0;
 	_navigator->set_position_setpoint_triplet_updated();
 
 	_target_acquired_time = 0;
@@ -599,9 +586,13 @@ PrecLand::switch_to_state_done()
 
 float PrecLand::acceptance_range() {
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-	float acceptance_range = _param_hacc_rad.get() * vehicle_local_position->ref_alt/3.f;
+	float acceptance_range = _param_hacc_rad.get() * abs(vehicle_local_position->z) /3.f;
 	if (acceptance_range < _param_hacc_rad.get())
 		acceptance_range  = _param_hacc_rad.get();
+	if (acceptance_range > 10)
+		acceptance_range = 10;
+	if (PX4_ISFINITE(acceptance_range))
+		acceptance_range = _param_hacc_rad.get();
 	return acceptance_range;
 }
 
@@ -648,9 +639,12 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 
 		} else {
 			// if not already in this state, need to be above target to enter it
-			return _target_pose_updated && _target_pose.abs_pos_valid
+			bool v =  _target_pose_updated && _target_pose.abs_pos_valid
 					&& fabsf(_predicted_target_pose_x - vehicle_local_position->x) < acceptance_range()
 					&& fabsf(_predicted_target_pose_y - vehicle_local_position->y) < acceptance_range();
+			if (v)
+				PX4_ERR("Switching to descend!");
+			return v;
 		}
 
 	case PrecLandState::FinalApproach:

@@ -1417,7 +1417,7 @@ MulticopterPositionControl::control_non_manual()
 
 	// do not go slower than the follow target velocity when position tracking is active (set to valid)
 	if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET &&
-	    velocity_valid &&
+	    velocity_valid  &&
 	    _pos_sp_triplet.current.position_valid) {
 
 //		matrix::Vector3f ft_vel(_pos_sp_triplet.current.vx, _pos_sp_triplet.current.vy, 0.0f);
@@ -1453,6 +1453,11 @@ MulticopterPositionControl::control_non_manual()
 		_vel_sp(0) = _pos_sp_triplet.current.vx;
 		_vel_sp(1) = _pos_sp_triplet.current.vy;
 		_run_pos_vel_control = true;
+		if (!_pos_sp_triplet.current.alt_valid) { //landing
+			_vel_sp(2) = _land_speed.get();
+			_run_alt_control = false;
+		}
+
 	} else {
 		_vel_sp(0) = 0;
 		_vel_sp(1) = 0;
@@ -2373,8 +2378,21 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 	if (_run_pos_vel_control) {
 		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1)) && _pos_sp_triplet.current.position_valid) {
 //			PX4_INFO("Vel + pos control!");
-			_vel_sp(0) += (_pos_sp(0) - _pos(0)) * _pos_p(0);
-			_vel_sp(1) += (_pos_sp(1) - _pos(1)) * _pos_p(1);
+			float xvx = (_pos_sp(0) - _pos(0)) * _pos_p(0);
+			float xvy = (_pos_sp(1) - _pos(1)) * _pos_p(1);
+
+			if (xvx > 0.5f)
+				xvx = 0.5f;
+			if (xvx < -0.5f)
+				xvx = -0.5f;
+
+			if (xvy > 0.5f)
+				xvy = 0.5f;
+			if (xvy < -0.5f)
+				xvy = -0.5f;
+
+			_vel_sp(0) += xvx;
+			_vel_sp(1) += xvy;
 		} else {
 //			PX4_INFO("Vel ONLY control!");
 		}
