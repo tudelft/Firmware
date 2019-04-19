@@ -174,9 +174,6 @@ void PrecLand::predict_target() {
 	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
 	dt /= SEC2USEC;
 	if(_target_pose_valid && _target_pose.rel_vel_valid ){
-
-
-
 		float ls;
 		ls = _target_pose.raw_angle*0.7f; // todo: 0.7 -> use land speed param
 		if (ls > 0.7f)
@@ -249,19 +246,17 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	float time_since_last_sighting = (now - last_good_target_pose_time);
 	time_since_last_sighting /= SEC2USEC;
 
-	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-
 	if (time_since_last_sighting < 10 ) {
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.vx = _target_pose.vx_rel + vehicle_local_position->vx;
-		pos_sp_triplet->current.vy = _target_pose.vy_rel + vehicle_local_position->vy;
+		pos_sp_triplet->current.vx = _target_pose.vx_abs;
+		pos_sp_triplet->current.vy = _target_pose.vy_abs;
 		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.velocity_valid = true;
 		pos_sp_triplet->current.position_valid = true;
 
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
-		//std::cout << "Follow: " << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << " |v| " << v << " last sighting: " << time_since_last_sighting << std::endl;
+//        	std::cout << "Follow pos: " << px << ", " << py << " vel: "  << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << " last sighting: " << time_since_last_sighting << std::endl;
 
 	} else if (time_since_last_sighting > 10){
 		pos_sp_triplet->current.lat = lat;
@@ -354,9 +349,9 @@ PrecLand::run_state_horizontal_approach()
 		PX4_ERR("Can't switch to fallback landing");
 	}
 
-	float px = _target_pose.x_abs; // + 1.f*powf(v_x.get_latest(),3);
-	float py = _target_pose.y_abs; // + 1.f*powf(v_y.get_latest(),3);
-	//slewrate(px, py);
+	float px = _target_pose.x_abs;
+	float py = _target_pose.y_abs;
+//	slewrate(px, py);
 	update_postriplet(px,py,false);
 }
 
