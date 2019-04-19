@@ -2376,6 +2376,7 @@ void
 MulticopterPositionControl::calculate_velocity_setpoint()
 {
 	if (_run_pos_vel_control) {
+		_run_pos_vel_control = false;
 		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1)) && _pos_sp_triplet.current.position_valid) {
 //			PX4_INFO("Vel + pos control!");
 			float xvx = (_pos_sp(0) - _pos(0)) * _pos_p(0);
