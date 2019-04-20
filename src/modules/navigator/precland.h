@@ -158,7 +158,7 @@ private:
 	matrix::Vector2f _sp_pev;
 	matrix::Vector2f _sp_pev_prev;
 
-	Smoother land_speed;
+	Smoother land_speed, vx,vy;
 	float last_good_target_pose_x;
 	float last_good_target_pose_y;
 	uint64_t last_good_target_pose_time;

@@ -98,17 +98,17 @@ void LandingTargetEstimator::update()
 			// predict target position with the help of accel data
 			matrix::Vector3f a;
 
-			if (_vehicleAttitude_valid && _sensorBias_valid) {
-				matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
-				_R_att = matrix::Dcm<float>(q_att);
-				a(0) = _sensorBias.accel_x;
-				a(1) = _sensorBias.accel_y;
-				a(2) = _sensorBias.accel_z;
-				a = _R_att * a;
+//			if (_vehicleAttitude_valid && _sensorBias_valid) {
+//				matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
+//				_R_att = matrix::Dcm<float>(q_att);
+//				a(0) = _sensorBias.accel_x;
+//				a(1) = _sensorBias.accel_y;
+//				a(2) = _sensorBias.accel_z;
+//				a = _R_att * a;
 
-			} else {
+//			} else {
 				a.zero();
-			}
+//			}
 
 			_kalman_filter_x.predict(dt, -a(0), _params.acc_unc);
 			_kalman_filter_y.predict(dt, -a(1), _params.acc_unc);
@@ -144,8 +144,6 @@ void LandingTargetEstimator::update()
 	sensor_ray(0) = -_irlockReport.pos_y * _params.scale_y; // forward
 	sensor_ray(1) = _irlockReport.pos_x * _params.scale_x; // right
 	sensor_ray(2) = 1.0f;
-	//printf("irlock: %f, %f\n",(double)sensor_ray(0),(double)sensor_ray(1));
-
 
 	matrix::Vector<float, 3> zero_ray; // to check what would be the projected location of a target if it would be in the middle of the image
 	zero_ray(0) = 0.0f;
@@ -204,7 +202,7 @@ void LandingTargetEstimator::update()
 		} else {
 			_faulty = false;
 		}
-		if (!update_x || !update_y) {
+		if (!zero_update_x || !zero_update_y) {
 			if (!_zero_faulty) {
 				_zero_faulty=true;
 				PX4_WARN("Landing target zero measurement rejected:%s%s", zero_update_x ? "" : " x", zero_update_y ? "" : " y");
@@ -293,8 +291,6 @@ void LandingTargetEstimator::update()
 			} else {
 				orb_publish(ORB_ID(landing_target_pose), _targetPosePub, &_target_pose);
 			}
-
-			//			PX4_INFO("%f, %f vs %f. %f",(double)_target_pose.x_rel,(double)_target_pose.y_rel,(double)_target_pose.zero_x_rel,(double)_target_pose.zero_y_rel );
 
 			_last_update = hrt_absolute_time();
 			_last_predict = _last_update;

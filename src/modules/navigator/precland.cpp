@@ -71,6 +71,8 @@ PrecLand::PrecLand(Navigator *navigator) :
 void
 PrecLand::on_activation()
 {
+	vx.init(_param_smt_wdt.get());
+	vy.init(_param_smt_wdt.get());
 	land_speed.init(5,0.1f);
 	v_prev_initialised = false;
 
@@ -249,8 +251,14 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	if (time_since_last_sighting < 10 ) {
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.vx = _target_pose.vx_abs;
-		pos_sp_triplet->current.vy = _target_pose.vy_abs;
+		pos_sp_triplet->current.vx = vx.addSample(_target_pose.vx_abs);
+		pos_sp_triplet->current.vy = vy.addSample(_target_pose.vy_abs);
+		if (!vx.get_ready())
+			pos_sp_triplet->current.vx = 0;
+		if (!vy.get_ready())
+			pos_sp_triplet->current.vy = 0;
+
+
 		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.velocity_valid = true;
 		pos_sp_triplet->current.position_valid = true;
@@ -258,7 +266,7 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
 //        	std::cout << "Follow pos: " << px << ", " << py << " vel: "  << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << " last sighting: " << time_since_last_sighting << std::endl;
 
-	} else if (time_since_last_sighting > 10){
+	} else if (time_since_last_sighting > 10){ // todo: this is probably never reached
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
 		pos_sp_triplet->current.vx = 0;
@@ -328,7 +336,7 @@ PrecLand::run_state_horizontal_approach()
 			_point_reached_time = hrt_absolute_time();
 		}
 
-		if (hrt_absolute_time() - _point_reached_time > 2000000) {
+		if (hrt_absolute_time() - _point_reached_time > 500000) { //TODO: make this smarter? A param?
 			// if close enough for descent above target go to descend above target
 			if (switch_to_state_descend_above_target()) {
 				return;
@@ -531,9 +539,8 @@ PrecLand::switch_to_state_done()
 	return true;
 }
 
-float PrecLand::acceptance_range() {
-	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-	float acceptance_range = _param_hacc_rad.get() * abs(vehicle_local_position->z) /3.f;
+float PrecLand::acceptance_range() {	
+	float acceptance_range = _param_hacc_rad.get() * (abs(_target_pose.z_rel) /3.f);
 	if (acceptance_range < _param_hacc_rad.get())
 		acceptance_range  = _param_hacc_rad.get();
 	if (acceptance_range > 10)
@@ -587,8 +594,8 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		} else {
 			// if not already in this state, need to be above target to enter it
 			bool v =  _target_pose_updated && _target_pose.abs_pos_valid
-					&& fabsf(_target_pose.x_abs - vehicle_local_position->x) < acceptance_range()
-					&& fabsf(_target_pose.y_abs - vehicle_local_position->y) < acceptance_range();
+					&& fabsf(_target_pose.x_rel ) < acceptance_range()
+					&& fabsf(_target_pose.y_rel) < acceptance_range();
 			return v;
 		}
 

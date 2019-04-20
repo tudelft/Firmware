@@ -1417,7 +1417,7 @@ MulticopterPositionControl::control_non_manual()
 
 	// do not go slower than the follow target velocity when position tracking is active (set to valid)
 	if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET &&
-	    velocity_valid  &&
+	    velocity_valid &&
 	    _pos_sp_triplet.current.position_valid) {
 
 //		matrix::Vector3f ft_vel(_pos_sp_triplet.current.vx, _pos_sp_triplet.current.vy, 0.0f);
