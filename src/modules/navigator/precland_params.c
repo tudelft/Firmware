@@ -58,14 +58,13 @@ PARAM_DEFINE_FLOAT(PLD_BTOUT, 5.0f);
  *
  * Start descending if closer above landing target than this.
  *
- * @unit m
  * @min 0.0
- * @max 10
+ * @max 0.64
  * @decimal 2
- * @increment 0.1
+ * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_HACC_RAD, 0.2f);
+PARAM_DEFINE_FLOAT(PLD_HACC_RAD, 0.3f);
 
 /**
  * Final approach altitude
@@ -149,3 +148,62 @@ PARAM_DEFINE_FLOAT(PLD_SRCH_TOUT, 10.0f);
  * @group Precision Land
  */
 PARAM_DEFINE_INT32(PLD_MAX_SRCH, 3);
+
+
+
+/**
+ * Position P gain
+ *
+ * @min 0.0
+ * @max 50
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_P_XY_G, 3.5f);
+
+/**
+ * Position I gain
+ *
+ * @min 0.0
+ * @max 50
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_I_XY_G, 0.015f);
+
+/**
+ * Position D gain
+ * (NOT USED AT THE MOMENT)
+ * @min 0.0
+ * @max 50
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_D_XY_G, 1.3f);
+
+/**
+ * Bound speed for position control in x direction
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 5
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_I_X_B, 1.5f);
+
+/**
+ * Bound speed for position control in y direction
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 5
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_I_Y_B, 2.5f);

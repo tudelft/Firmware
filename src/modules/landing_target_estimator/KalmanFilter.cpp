@@ -97,8 +97,8 @@ bool KalmanFilter::update(float meas, float measUnc)
 	// outlier rejection
 	float beta = _residual / _innovCov * _residual;
 
-	// 5% false alarm probability
-	if (beta > 3.84f) {
+	// 2.5% false alarm probability
+	if (beta > 2.f*3.84f) {
 		return false;
 	}
 

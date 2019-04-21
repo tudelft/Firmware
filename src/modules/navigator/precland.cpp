@@ -56,7 +56,7 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 
-//#include <iostream>
+#include <iostream>
 
 #define SEC2USEC 1000000.0f
 
@@ -71,10 +71,11 @@ PrecLand::PrecLand(Navigator *navigator) :
 void
 PrecLand::on_activation()
 {
-	vx.init(_param_smt_wdt.get());
-	vy.init(_param_smt_wdt.get());
-	land_speed.init(5,0.1f);
-	v_prev_initialised = false;
+	d_angle_x_smthr.init(10);
+	d_angle_y_smthr.init(10);
+	vx_smthr.init(_param_smt_wdt.get());
+	vy_smthr.init(_param_smt_wdt.get());
+	land_speed_smthr.init(_param_smt_wdt.get(),0.f);
 
 	// We need to subscribe here and not in the constructor because constructor is called before the navigator task is spawned
 	if (_target_pose_sub < 0) {
@@ -175,23 +176,32 @@ void PrecLand::predict_target() {
 	uint64_t now = hrt_absolute_time();
 	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
 	dt /= SEC2USEC;
-	if(_target_pose_valid && _target_pose.rel_vel_valid ){
-		float ls;
-		ls = _target_pose.raw_angle*0.7f; // todo: 0.7 -> use land speed param
-		if (ls > 0.7f)
-			ls = 0.7f;
-		else if (ls<0.05f)
-			ls = 0.05f;
-		land_speed.addSample(ls);
+	if(_target_pose_valid && _target_pose.rel_vel_valid && in_acceptance_range() ){
+		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
+
+		float max_land_speed = 2.f;
+		float h = -_navigator->get_local_position()->z;
+		if (h>15)
+			max_land_speed = 4;
+		if (h<4)
+			max_land_speed = 0.7;
+
+		float land_speed = 1.f-(1.f/_param_hacc_rad.get())*a * max_land_speed;
+		if (land_speed > max_land_speed)
+			land_speed = max_land_speed;
+		else if (land_speed<0.01f)
+			land_speed = 0.01f;
+		land_speed_smthr.addSample(land_speed);
 	} else {
-		land_speed.addSample(0.05);
+		land_speed_smthr.addSample(0.f);
 	}
+	std::cout << "angle: " << _target_pose.angle_x << ", " << _target_pose.angle_y
+		  << " land speed: " << land_speed_smthr.get_latest() << std::endl;
 
 	if(_target_pose_valid && _target_pose.abs_pos_valid){
 		last_good_target_pose_time = now;
 		last_good_target_pose_x = _target_pose.x_abs;
 		last_good_target_pose_y = _target_pose.y_abs;
-		v_prev_initialised = true;
 	}
 }
 
@@ -241,6 +251,7 @@ PrecLand::run_state_start()
 
 void PrecLand::update_postriplet(float px, float py, bool land){
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+
 	double lat, lon;
 	map_projection_reproject(&_map_ref, px, py, &lat, &lon);
 
@@ -249,24 +260,82 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	time_since_last_sighting /= SEC2USEC;
 
 	if (time_since_last_sighting < 10 ) {
+
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.vx = vx.addSample(_target_pose.vx_abs);
-		pos_sp_triplet->current.vy = vy.addSample(_target_pose.vy_abs);
-		if (!vx.get_ready())
-			pos_sp_triplet->current.vx = 0;
-		if (!vy.get_ready())
-			pos_sp_triplet->current.vy = 0;
+		pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
+		pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
+
+		float ss_p_gain = _param_pld_p_xy_g.get(); //pos p gain
+		float ss_i_gain = _param_pld_i_xy_g.get()/100.f; // pos i gai
+		float ss_d_gain = _param_pld_d_xy_g.get(); //pos p gain
+		float i_x_bound = _param_pld_i_x_b.get(); //bound pos y control m/s
+		float i_y_bound = _param_pld_i_y_b.get(); //bound pos y control m/s
+
+		//only activate pos control when drone is up to speed
+		float dv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vx_rel,2));
+
+		static float angle_x_prev = _target_pose.angle_x;
+		static float angle_y_prev = _target_pose.angle_x;
+		static uint64_t t_prev = 0;
+
+		float dt = (_target_pose.timestamp - t_prev ) / 1e6f;
+
+		float d_angle_x = _target_pose.angle_x - angle_x_prev;
+		float d_angle_y = _target_pose.angle_y - angle_y_prev;
+
+		float d_angle_x_smoothed = 0;
+		float d_angle_y_smoothed = 0;
+		if (t_prev>0){
+			d_angle_x_smoothed = d_angle_x_smthr.addSample(d_angle_x/dt);
+			d_angle_y_smoothed = d_angle_y_smthr.addSample(d_angle_y/dt);
+		}
+		angle_x_prev = _target_pose.angle_x;
+		angle_y_prev = _target_pose.angle_y;
+		t_prev = _target_pose.timestamp;
+
+		no_v_diff_cnt++;
+		if (dv<1 && no_v_diff_cnt < 102)
+			no_v_diff_cnt++;
+		if (no_v_diff_cnt > 100){
+			angle_x_i_err+=_target_pose.angle_x;
+			angle_y_i_err+=_target_pose.angle_y;
+
+			float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
+			float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
 
-		pos_sp_triplet->current.vz = 0;
+			if (ss_vx>i_x_bound) {
+				ss_vx = i_x_bound;
+//				angle_x_i_err = i_x_bound / ss_i_gain;
+			} else if (ss_vx<-i_x_bound){
+				ss_vx = -i_x_bound;
+//				angle_x_i_err = -i_x_bound / ss_i_gain;
+			}
+			if (ss_vy>i_y_bound){
+				ss_vy = i_y_bound;
+//				angle_y_i_err = i_y_bound / ss_i_gain;
+			} else if (ss_vy<-i_y_bound) {
+				ss_vy = -i_y_bound;
+//				angle_y_i_err = -i_y_bound / ss_i_gain;
+			}
+
+			pos_sp_triplet->current.vx +=ss_vx;
+			pos_sp_triplet->current.vy +=ss_vy;
+//			std::cout << "vel smoothed: "  << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy
+//				  << " angle g: "  <<ss_vx << ", " << ss_vy
+//				  << " last sighting: " << time_since_last_sighting  << std::endl;
+		}
+
 		pos_sp_triplet->current.velocity_valid = true;
-		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.position_valid = false;
 
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
-//        	std::cout << "Follow pos: " << px << ", " << py << " vel: "  << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy << " last sighting: " << time_since_last_sighting << std::endl;
+//		std::cout << "Follow pos: " << px << ", " << py << " vel smoothed: "  << pos_sp_triplet->current.vx << ", " << pos_sp_triplet->current.vy
+//			  << " vel raw: "  << _target_pose.vx_abs << ", " << _target_pose.vy_abs
+//			  << " last sighting: " << time_since_last_sighting  << std::endl;
 
-	} else if (time_since_last_sighting > 10){ // todo: this is probably never reached
+	} else if (time_since_last_sighting > 10){ //TODO: weird, this flies back to some last seen location or something
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
 		pos_sp_triplet->current.vx = 0;
@@ -295,9 +364,10 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	}
 
 	if (land) {
-		pos_sp_triplet->current.vz = land_speed.get_latest();
+		pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 		pos_sp_triplet->current.alt_valid = false;
 	} else {
+		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.alt = _approach_alt;
 		pos_sp_triplet->current.alt_valid = true;
 	}
@@ -467,6 +537,10 @@ PrecLand::switch_to_state_horizontal_approach()
 
 		_state = PrecLandState::HorizontalApproach;
 		_state_start_time = hrt_absolute_time();
+
+		angle_x_i_err = 0;
+		angle_y_i_err = 0;
+		no_v_diff_cnt =0;
 		return true;
 	}
 
@@ -539,20 +613,17 @@ PrecLand::switch_to_state_done()
 	return true;
 }
 
-float PrecLand::acceptance_range() {	
-	float acceptance_range = _param_hacc_rad.get() * (abs(_target_pose.z_rel) /3.f);
-	if (acceptance_range < _param_hacc_rad.get())
-		acceptance_range  = _param_hacc_rad.get();
-	if (acceptance_range > 10)
-		acceptance_range = 10;
-	if (PX4_ISFINITE(acceptance_range))
-		acceptance_range = _param_hacc_rad.get();
-	return acceptance_range;
+bool PrecLand::in_acceptance_range() {
+	float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
+	return (a<_param_hacc_rad.get() && no_v_diff_cnt>=100 );
 }
 
 bool PrecLand::check_state_conditions(PrecLandState state)
 {
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+	uint64_t now = hrt_absolute_time();
+	float time_since_last_sighting = (now - last_good_target_pose_time);
+	time_since_last_sighting /= SEC2USEC;
 
 	switch (state) {
 	case PrecLandState::Start:
@@ -561,8 +632,7 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 	case PrecLandState::HorizontalApproach:
 		// if we're already in this state, only want to make it invalid if we reached the target but can't see it anymore
 		if (_state == PrecLandState::HorizontalApproach) {
-			if (fabsf(_target_pose.x_abs - vehicle_local_position->x) < acceptance_range()
-					&& fabsf(_target_pose.x_abs - vehicle_local_position->y) < acceptance_range()) {
+			if (in_acceptance_range()) {
 				// we've reached the position where we predicted we'd see the target. If we don't see it now, we may need to do something
 
 				//continue to go to the prediction (but only if available -> filter is ready) until the timeout, or if we actually see the target now
@@ -580,7 +650,6 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		return _target_pose_updated && _target_pose_valid && _target_pose.abs_pos_valid && _target_pose.rel_vel_valid;
 
 	case PrecLandState::DescendAboveTarget:
-
 		// if we're already in this state, only leave it if target becomes unusable, don't care about horizontall offset to target
 		if (_state == PrecLandState::DescendAboveTarget) {
 			// if we're close to the ground, we're more critical of target timeouts so we quickly go into descend
@@ -588,18 +657,15 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 				return hrt_absolute_time() - _target_pose.timestamp < 500000; // 0.5s
 
 			} else {
-				return _target_pose_valid && _target_pose.abs_pos_valid;
+				return time_since_last_sighting < 3;
 			}
 
 		} else {
 			// if not already in this state, need to be above target to enter it
-			bool v =  _target_pose_updated && _target_pose.abs_pos_valid
-					&& fabsf(_target_pose.x_rel ) < acceptance_range()
-					&& fabsf(_target_pose.y_rel) < acceptance_range();
+			bool v =  _target_pose_updated && _target_pose.abs_pos_valid && in_acceptance_range() && time_since_last_sighting < 1;
 			return v;
 		}
-
-	case PrecLandState::FinalApproach:
+	 case PrecLandState::FinalApproach:
 		return _target_pose_valid && _target_pose.abs_pos_valid
 				&& (_target_pose.z_abs - vehicle_local_position->z) < _param_final_approach_alt.get();
 
@@ -691,11 +757,13 @@ void Smoother::init(int width, float value)
 	{
 		_rbuf(i) = value;
 	}
+	_ready = true;
 }
 
 void Smoother::init(int width)
 {
 	init(width,0);
+	_ready = false;
 }
 
 void Smoother::reset()

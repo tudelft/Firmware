@@ -1443,7 +1443,7 @@ MulticopterPositionControl::control_non_manual()
 		_run_pos_vel_control = true;
 
 		if (!_pos_sp_triplet.current.alt_valid) { //landing
-			_vel_sp(2) = _land_speed.get();
+			_vel_sp(2) = _pos_sp_triplet.current.vz;
 			_run_alt_control = false;
 		}
 
@@ -1454,7 +1454,7 @@ MulticopterPositionControl::control_non_manual()
 		_vel_sp(1) = _pos_sp_triplet.current.vy;
 		_run_pos_vel_control = true;
 		if (!_pos_sp_triplet.current.alt_valid) { //landing
-			_vel_sp(2) = _land_speed.get();
+			_vel_sp(2) =  _pos_sp_triplet.current.vz;
 			_run_alt_control = false;
 		}
 
@@ -2382,34 +2382,25 @@ MulticopterPositionControl::calculate_velocity_setpoint()
 			float xvx = (_pos_sp(0) - _pos(0)) * _pos_p(0);
 			float xvy = (_pos_sp(1) - _pos(1)) * _pos_p(1);
 
-			if (xvx > 0.5f)
-				xvx = 0.5f;
-			if (xvx < -0.5f)
-				xvx = -0.5f;
-
-			if (xvy > 0.5f)
-				xvy = 0.5f;
-			if (xvy < -0.5f)
-				xvy = -0.5f;
-
 			_vel_sp(0) += xvx;
 			_vel_sp(1) += xvy;
 		} else {
 //			PX4_INFO("Vel ONLY control!");
 		}
 
+		float maxv = _vel_max_xy_param.get();
 		if (!PX4_ISFINITE(_vel_sp(0)))
 			_vel_sp(0) = 0;
-		else if (_vel_sp(0)>5)
-			_vel_sp(0) = 5;
-		else if (_vel_sp(0)<-5)
-			_vel_sp(0) = -5;
+		else if (_vel_sp(0)>maxv)
+			_vel_sp(0) = maxv;
+		else if (_vel_sp(0)<-maxv)
+			_vel_sp(0) = -maxv;
 		if (!PX4_ISFINITE(_vel_sp(1)))
 			_vel_sp(1) = 0;
-		else if (_vel_sp(1)>5)
-			_vel_sp(1) = 5;
-		else if (_vel_sp(1)<-5)
-			_vel_sp(1) = -5;
+		else if (_vel_sp(1)>maxv)
+			_vel_sp(1) = maxv;
+		else if (_vel_sp(1)<-maxv)
+			_vel_sp(1) = -maxv;
 
 
 		/* run position & altitude controllers, if enabled (otherwise use already computed velocity setpoints) */

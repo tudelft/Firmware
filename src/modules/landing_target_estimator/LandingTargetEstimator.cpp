@@ -98,17 +98,17 @@ void LandingTargetEstimator::update()
 			// predict target position with the help of accel data
 			matrix::Vector3f a;
 
-//			if (_vehicleAttitude_valid && _sensorBias_valid) {
-//				matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
-//				_R_att = matrix::Dcm<float>(q_att);
-//				a(0) = _sensorBias.accel_x;
-//				a(1) = _sensorBias.accel_y;
-//				a(2) = _sensorBias.accel_z;
-//				a = _R_att * a;
+			if (_vehicleAttitude_valid && _sensorBias_valid) {
+				matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
+				_R_att = matrix::Dcm<float>(q_att);
+				a(0) = _sensorBias.accel_x;
+				a(1) = _sensorBias.accel_y;
+				a(2) = _sensorBias.accel_z;
+				a = _R_att * a;
 
-//			} else {
+			} else {
 				a.zero();
-//			}
+			}
 
 			_kalman_filter_x.predict(dt, -a(0), _params.acc_unc);
 			_kalman_filter_y.predict(dt, -a(1), _params.acc_unc);
@@ -146,40 +146,46 @@ void LandingTargetEstimator::update()
 	sensor_ray(2) = 1.0f;
 
 	matrix::Vector<float, 3> zero_ray; // to check what would be the projected location of a target if it would be in the middle of the image
-	zero_ray(0) = 0.0f;
-	zero_ray(1) = 0.0f;
-	zero_ray(2) = 1.0f;
+	zero_ray(0) = sensor_ray(0);
+	zero_ray(1) = sensor_ray(1);
+	zero_ray(2) = sensor_ray(2);
 
 	// rotate the unit ray into the navigation frame, assume sensor frame = body frame
 	matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
 	_R_att = matrix::Dcm<float>(q_att);
 	sensor_ray = _R_att * sensor_ray;
-	zero_ray = _R_att * zero_ray;
+	//zero_ray = _R_att * zero_ray;
 
 	if (fabsf(sensor_ray(2)) < 1e-6f) {
 		// z component of measurement unsafe, don't use this measurement
 		return;
 	}
 
-	float dist = _vehicleLocalPosition.dist_bottom;
+	float dist = -_vehicleLocalPosition.z-3; //dist_to_bottom gives weird result in sim!?
+	float alpha = sqrtf(powf(sensor_ray(0),2) + powf(sensor_ray(1),2));
+	float dist_to_marker = dist / cosf(alpha);
 
-	// scale the ray s.t. the z component has length of dist
-	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist;
-	_rel_pos(1) = sensor_ray(1) / sensor_ray(2) * dist;
+//	PX4_INFO("a: %f z: %f -> d2m: %f" , static_cast<double>(alpha),static_cast<double>(dist),static_cast<double>(dist_to_marker));
+
+	// scale the ray such that the z component has length of dist
+	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist_to_marker;
+	_rel_pos(1) = sensor_ray(1) / sensor_ray(2) * dist_to_marker;
 
 	_zero_rel_pos(0) = zero_ray(0) / zero_ray(2) * dist;
 	_zero_rel_pos(1) = zero_ray(1) / zero_ray(2) * dist;
 
 	float x_abs = _rel_pos(0) + _vehicleLocalPosition.x;
 	float y_abs = _rel_pos(1) + _vehicleLocalPosition.y;
+	float zero_x_abs = _zero_rel_pos(0) + _vehicleLocalPosition.x;
+	float zero_y_abs = _zero_rel_pos(1) + _vehicleLocalPosition.y;
 
 	if (!_estimator_initialized) {
 		PX4_INFO("Init");
 		_kalman_filter_x.init(x_abs, 0, _params.pos_unc_init, _params.vel_unc_init);
 		_kalman_filter_y.init(y_abs, 0, _params.pos_unc_init, _params.vel_unc_init);
 
-		_kalman_filter_zero_x.init(_zero_rel_pos(0), 0, _params.pos_unc_init, _params.vel_unc_init);
-		_kalman_filter_zero_y.init(_zero_rel_pos(1), 0, _params.pos_unc_init, _params.vel_unc_init);
+		_kalman_filter_zero_x.init(zero_x_abs, 0, _params.pos_unc_init, _params.vel_unc_init);
+		_kalman_filter_zero_y.init(zero_y_abs, 0, _params.pos_unc_init, _params.vel_unc_init);
 
 		_estimator_initialized = true;
 		_last_update = hrt_absolute_time();
@@ -190,8 +196,8 @@ void LandingTargetEstimator::update()
 		bool update_x = _kalman_filter_x.update(x_abs, _params.meas_unc * dist * dist);
 		bool update_y = _kalman_filter_y.update(y_abs, _params.meas_unc * dist * dist);
 
-		bool zero_update_x = _kalman_filter_zero_x.update(_zero_rel_pos(0), _params.meas_unc * dist * dist);
-		bool zero_update_y = _kalman_filter_zero_y.update(_zero_rel_pos(1), _params.meas_unc * dist * dist);
+		bool zero_update_x = _kalman_filter_zero_x.update(zero_x_abs, _params.meas_unc * dist * dist);
+		bool zero_update_y = _kalman_filter_zero_y.update(zero_y_abs, _params.meas_unc * dist * dist);
 
 		if (!update_x || !update_y) {
 			if (!_faulty) {
@@ -217,7 +223,7 @@ void LandingTargetEstimator::update()
 			_target_pose.timestamp = _irlockReport.timestamp;
 
 			float x, xvel, y, yvel, covx, covx_v, covy, covy_v;
-			float zero_x, zero_xvel, zero_y, zero_yvel, zero_covx, zero_covx_v, zero_covy, zero_covy_v;
+			float zero_x, zero_xvel, zero_y, zero_yvel;
 			_kalman_filter_x.getState(x, xvel);
 			_kalman_filter_x.getCovariance(covx, covx_v);
 
@@ -225,10 +231,7 @@ void LandingTargetEstimator::update()
 			_kalman_filter_y.getCovariance(covy, covy_v);
 
 			_kalman_filter_zero_x.getState(zero_x, zero_xvel);
-			_kalman_filter_zero_x.getCovariance(zero_covx, zero_covx_v);
-
 			_kalman_filter_zero_y.getState(zero_y, zero_yvel);
-			_kalman_filter_zero_y.getCovariance(zero_covy, zero_covy_v);
 
 			_target_pose.is_static = (_params.mode == TargetMode::Stationary);
 
@@ -237,38 +240,35 @@ void LandingTargetEstimator::update()
 			_target_pose.x_rel = x-_vehicleLocalPosition.x;
 			_target_pose.y_rel = y - _vehicleLocalPosition.y;
 			_target_pose.z_rel = dist;
-			_target_pose.vx_rel = xvel - _vehicleLocalPosition.vx;
-			_target_pose.vy_rel = yvel - _vehicleLocalPosition.vy;
+			if (_vehicleLocalPosition.v_xy_valid) {
+				_target_pose.vx_rel = xvel - _vehicleLocalPosition.vx;
+				_target_pose.vy_rel = yvel - _vehicleLocalPosition.vy;
+			} else {
+				_target_pose.vx_rel = 0;
+				_target_pose.vy_rel = 0;
+			}
+
 			_target_pose.vx_abs = xvel;
 			_target_pose.vy_abs = yvel;
 			_target_pose.cov_x_rel = covx;
 			_target_pose.cov_y_rel = covy;
 			_target_pose.cov_vx_rel = covx_v;
 			_target_pose.cov_vy_rel = covy_v;
+			_target_pose.angle_x = zero_ray(0);
+			_target_pose.angle_y = zero_ray(1);
 
-			//			_target_pose.zero_rel_pos_valid = !_zero_faulty;
-			//			_target_pose.zero_rel_vel_valid = !_zero_faulty;
-			//			_target_pose.zero_x_rel = zero_x;
-			//			_target_pose.zero_y_rel = zero_y;
-			//			_target_pose.zero_z_rel = dist;
-			//			_target_pose.zero_vx_rel = zero_xvel;
-			//			_target_pose.zero_vy_rel = zero_yvel;
-			//			_target_pose.zero_cov_x_rel = zero_covx;
-			//			_target_pose.zero_cov_y_rel = zero_covy;
-			//			_target_pose.zero_cov_vx_rel = covx_v;
-			//			_target_pose.zero_cov_vy_rel = covy_v;
-
+			_target_pose.zero_rel_pos_valid = !_zero_faulty;
+			_target_pose.zero_x_rel = zero_x-_vehicleLocalPosition.x;
+			_target_pose.zero_y_rel = zero_y-_vehicleLocalPosition.y;
 
 			if (_vehicleLocalPosition_valid && _vehicleLocalPosition.xy_valid) {
-				_target_pose.x_abs = x ;
-				_target_pose.y_abs = y ;
-				_target_pose.z_abs = dist + _vehicleLocalPosition.z;
+				_target_pose.x_abs = x;
+				_target_pose.y_abs = y;
 				_target_pose.abs_pos_valid = true;
 
-				//				_target_pose.zero_x_abs = zero_x + _vehicleLocalPosition.x;
-				//				_target_pose.zero_y_abs = zero_y + _vehicleLocalPosition.y;
-				//				_target_pose.zero_z_abs = dist + _vehicleLocalPosition.z;
-				//				_target_pose.zero_abs_pos_valid = true;
+				_target_pose.zero_x_abs = zero_x;
+				_target_pose.zero_y_abs = zero_y;
+				_target_pose.zero_abs_pos_valid = true;
 
 			} else {
 				_target_pose.abs_pos_valid = false;
