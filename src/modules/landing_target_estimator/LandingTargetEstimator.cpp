@@ -264,11 +264,11 @@ void LandingTargetEstimator::update()
 			if (_vehicleLocalPosition_valid && _vehicleLocalPosition.xy_valid) {
 				_target_pose.x_abs = x;
 				_target_pose.y_abs = y;
-				_target_pose.abs_pos_valid = true;
+				_target_pose.abs_pos_valid = _target_pose.rel_pos_valid;
 
 				_target_pose.zero_x_abs = zero_x;
 				_target_pose.zero_y_abs = zero_y;
-				_target_pose.zero_abs_pos_valid = true;
+				_target_pose.zero_abs_pos_valid = _target_pose.rel_pos_valid;
 
 			} else {
 				_target_pose.abs_pos_valid = false;
