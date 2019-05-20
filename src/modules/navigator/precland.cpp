@@ -276,7 +276,7 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 		float dv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vx_rel,2));
 
 		static float angle_x_prev = _target_pose.angle_x;
-		static float angle_y_prev = _target_pose.angle_x;
+		static float angle_y_prev = _target_pose.angle_y;
 		static uint64_t t_prev = 0;
 
 		float dt = (_target_pose.timestamp - t_prev ) / 1e6f;
