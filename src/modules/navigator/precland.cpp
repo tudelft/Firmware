@@ -56,7 +56,7 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 
-#include <iostream>
+//#include <iostream>
 
 #define SEC2USEC 1000000.0f
 
@@ -212,6 +212,10 @@ void PrecLand::predict_target() {
 void
 PrecLand::run_state_start()
 {
+
+	angle_x_i_err = 0;
+	angle_y_i_err = 0;
+	no_v_diff_cnt =0;
 	// check if target visible and go to horizontal approach
 	if (switch_to_state_horizontal_approach()) {
 		return;
@@ -299,7 +303,7 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 		t_prev = _target_pose.timestamp;
 
 		no_v_diff_cnt++;
-		if (dv<1 && no_v_diff_cnt < 102)
+		if (dv<1 && no_v_diff_cnt < 102 && _target_pose.abs_pos_valid)
 			no_v_diff_cnt++;
 		if (no_v_diff_cnt > 100){
 			angle_x_i_err+=_target_pose.angle_x;
