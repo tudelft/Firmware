@@ -366,6 +366,21 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	if (land) {
 		pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 		pos_sp_triplet->current.alt_valid = false;
+
+		//land into the direction of the marker (adjust horizontal speed):
+		float vxr = _target_pose.x_rel / _target_pose.z_rel;
+		float vyr = _target_pose.y_rel / _target_pose.z_rel;
+		if (vxr > 1)
+			vxr = 1;
+		else if (vxr < -1)
+			vxr = -1;
+		if (vyr > 1)
+			vyr = 1;
+		else if (vyr < -1)
+			vyr = -1;
+		pos_sp_triplet->current.vx += vxr*pos_sp_triplet->current.vz;
+		pos_sp_triplet->current.vy += vyr*pos_sp_triplet->current.vz;
+
 	} else {
 		pos_sp_triplet->current.vz = 0;
 		pos_sp_triplet->current.alt = _approach_alt;
