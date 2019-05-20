@@ -76,6 +76,12 @@ PrecLand::on_activation()
 	vx_smthr.init(_param_smt_wdt.get());
 	vy_smthr.init(_param_smt_wdt.get());
 	land_speed_smthr.init(_param_smt_wdt.get(),0.f);
+	last_good_target_pose_time = 0;
+	angle_x_i_err = 0;
+	angle_y_i_err = 0;
+	no_v_diff_cnt =0;
+	_target_pose_valid = false;
+	_target_pose_updated = false;
 
 	// We need to subscribe here and not in the constructor because constructor is called before the navigator task is spawned
 	if (_target_pose_sub < 0) {
@@ -195,13 +201,11 @@ void PrecLand::predict_target() {
 	} else {
 		land_speed_smthr.addSample(0.f);
 	}
-	std::cout << "angle: " << _target_pose.angle_x << ", " << _target_pose.angle_y
-		  << " land speed: " << land_speed_smthr.get_latest() << std::endl;
+//	std::cout << "angle: " << _target_pose.angle_x << ", " << _target_pose.angle_y
+//		  << " land speed: " << land_speed_smthr.get_latest() << std::endl;
 
 	if(_target_pose_valid && _target_pose.abs_pos_valid){
 		last_good_target_pose_time = now;
-		last_good_target_pose_x = _target_pose.x_abs;
-		last_good_target_pose_y = _target_pose.y_abs;
 	}
 }
 
@@ -259,7 +263,7 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	float time_since_last_sighting = (now - last_good_target_pose_time);
 	time_since_last_sighting /= SEC2USEC;
 
-	if (time_since_last_sighting < 10 ) {
+	if (time_since_last_sighting < 10 && _target_pose.rel_vel_valid) {
 
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
@@ -343,7 +347,7 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 		pos_sp_triplet->current.velocity_valid = false;
 		pos_sp_triplet->current.position_valid = true;
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-		PX4_WARN("Holding Position: %f, %f because last sighting: %f", static_cast<double>(lat) , static_cast<double>(lon),static_cast<double>(time_since_last_sighting) );
+		//PX4_WARN("Holding Position: %f, %f because last sighting: %f", static_cast<double>(lat) , static_cast<double>(lon),static_cast<double>(time_since_last_sighting) );
 		//todo: use other means to find the boat?
 	}
 
@@ -629,8 +633,12 @@ PrecLand::switch_to_state_done()
 }
 
 bool PrecLand::in_acceptance_range() {
-	float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
-	return (a<_param_hacc_rad.get() && no_v_diff_cnt>=100 );
+	if (_target_pose.abs_pos_valid) {
+		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
+		return (a<_param_hacc_rad.get() && no_v_diff_cnt>=100 );
+	} else {
+		return false;
+	}
 }
 
 bool PrecLand::check_state_conditions(PrecLandState state)
