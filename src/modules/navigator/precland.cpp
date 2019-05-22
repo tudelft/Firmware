@@ -104,7 +104,7 @@ PrecLand::on_activation()
 
 	// Check that the current position setpoint is valid, otherwise land at current position
 	if (!pos_sp_triplet->current.valid) {
-		PX4_WARN("Resetting landing position to current position");
+		mavlink_log_info(&mavlink_log_pub,"Resetting landing position to current position");
 		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
 		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
 		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
@@ -181,6 +181,7 @@ PrecLand::on_active()
 void PrecLand::predict_target() {
 	count_div++;
 	float time_since_last_sighting = (hrt_absolute_time() - last_good_target_pose_time);
+	time_since_last_sighting /=SEC2USEC;
 	if(_target_pose_valid && _target_pose.rel_vel_valid && in_acceptance_range() ){
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
 
@@ -209,8 +210,8 @@ void PrecLand::predict_target() {
 			mavlink_log_info(&mavlink_log_pub, "Land speed %.2f x %.2f y %.2f H %.2f t %.2f", static_cast<double>(land_speed), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y), static_cast<double>(h),static_cast<double>(time_since_last_sighting));
 	} else {
 
-		if (!(count_div % 12))
-			mavlink_log_info(&mavlink_log_pub, "NOT IN LANDING ZONE %d %d %d t %.2f",_target_pose_valid , _target_pose.rel_vel_valid , in_acceptance_range(),static_cast<double>(time_since_last_sighting));
+		if (!(count_div % 12) && _target_pose.rel_pos_valid)
+			mavlink_log_info(&mavlink_log_pub, "NOT IN LANDING ZONE %d %d %d x %.2f y %.2f t %.2f",_target_pose_valid , _target_pose.rel_vel_valid , in_acceptance_range(), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y), static_cast<double>(time_since_last_sighting));
 
 
 		land_speed_smthr.addSample(0.f);
@@ -237,7 +238,7 @@ PrecLand::run_state_start()
 	if (_mode == PrecLandMode::Opportunistic) {
 		// could not see the target immediately, so just fall back to normal landing
 		if (!switch_to_state_fallback()) {
-			PX4_ERR("Can't switch to search or fallback landing");
+			mavlink_log_info(&mavlink_log_pub,"Can't switch to search or fallback landing");
 		}
 	}
 
@@ -257,14 +258,14 @@ PrecLand::run_state_start()
 			if (hrt_absolute_time() - _point_reached_time > 2000000) {
 				if (!switch_to_state_search()) {
 					if (!switch_to_state_fallback()) {
-						PX4_ERR("Can't switch to search or fallback landing");
+						mavlink_log_info(&mavlink_log_pub,"Can't switch to search or fallback landing");
 					}
 				}
 			}
 
 		} else {
 			if (!switch_to_state_fallback()) {
-				PX4_ERR("Can't switch to search or fallback landing");
+				mavlink_log_info(&mavlink_log_pub,"Can't switch to search or fallback landing");
 			}
 		}
 	}
@@ -411,7 +412,7 @@ PrecLand::run_state_horizontal_approach()
 
 	// check if target visible, if not go to start
 	if (!check_state_conditions(PrecLandState::HorizontalApproach)) {
-		PX4_WARN("Lost landing target while landing (horizontal approach).");
+		mavlink_log_info(&mavlink_log_pub,"Lost landing target while landing (horizontal approach).");
 
 		// Stay at current position for searching for the landing target
 		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
@@ -420,7 +421,7 @@ PrecLand::run_state_horizontal_approach()
 
 		if (!switch_to_state_start()) {
 			if (!switch_to_state_fallback()) {
-				PX4_ERR("Can't switch to fallback landing");
+				mavlink_log_info(&mavlink_log_pub,"Can't switch to fallback landing");
 			}
 		}
 
@@ -445,15 +446,15 @@ PrecLand::run_state_horizontal_approach()
 	}
 
 	if (hrt_absolute_time() - _state_start_time > STATE_TIMEOUT && !_param_only_flw.get()) {
-		PX4_ERR("Precision landing took too long during horizontal approach phase.");
+		mavlink_log_info(&mavlink_log_pub,"Precision landing took too long during horizontal approach phase.");
 
 		if (!switch_to_state_start()) {
 			if (!switch_to_state_fallback()) {
-				PX4_ERR("Can't switch to fallback landing");
+				mavlink_log_info(&mavlink_log_pub,"Can't switch to fallback landing");
 			}
 		}
 
-		PX4_ERR("Can't switch to fallback landing");
+		mavlink_log_info(&mavlink_log_pub,"Can't switch to fallback landing");
 	}
 
 	float px = _target_pose.x_abs;
@@ -470,7 +471,7 @@ PrecLand::run_state_descend_above_target()
 	// check if target visible
 	if (!check_state_conditions(PrecLandState::DescendAboveTarget)) {
 		if (!switch_to_state_final_approach()) {
-			PX4_WARN("Lost landing target while landing (descending).");
+			mavlink_log_info(&mavlink_log_pub,"Lost landing target while landing (descending).");
 
 			// Stay at current position for searching for the target
 			pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
@@ -479,7 +480,7 @@ PrecLand::run_state_descend_above_target()
 
 			if (!switch_to_state_start()) {
 				if (!switch_to_state_fallback()) {
-					PX4_ERR("Can't switch to fallback landing");
+					mavlink_log_info(&mavlink_log_pub,"Can't switch to fallback landing");
 				}
 			}
 		}
@@ -522,10 +523,10 @@ PrecLand::run_state_search()
 
 	// check if search timed out and go to fallback
 	if (hrt_absolute_time() - _state_start_time > _param_search_timeout.get()*SEC2USEC) {
-		PX4_WARN("Search timed out");
+		mavlink_log_info(&mavlink_log_pub,"Search timed out");
 
 		if (!switch_to_state_fallback()) {
-			PX4_ERR("Can't switch to fallback landing");
+			mavlink_log_info(&mavlink_log_pub,"Can't switch to fallback landing");
 		}
 	}
 }
@@ -602,7 +603,7 @@ PrecLand::switch_to_state_final_approach()
 bool
 PrecLand::switch_to_state_search()
 {
-	PX4_INFO("Climbing to search altitude.");
+	mavlink_log_info(&mavlink_log_pub,"Climbing to search altitude.");
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
@@ -620,7 +621,7 @@ PrecLand::switch_to_state_search()
 bool
 PrecLand::switch_to_state_fallback()
 {
-	PX4_WARN("Falling back to normal land.");
+	mavlink_log_info(&mavlink_log_pub,"Falling back to normal land.");
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
 	pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
