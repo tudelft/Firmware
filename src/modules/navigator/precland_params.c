@@ -51,7 +51,7 @@
  * @increment 0.5
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_BTOUT, 5.0f);
+PARAM_DEFINE_FLOAT(PLD_BTOUT, 10.0f);
 
 /**
  * Horizontal acceptance radius
@@ -64,7 +64,7 @@ PARAM_DEFINE_FLOAT(PLD_BTOUT, 5.0f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_HACC_RAD, 0.3f);
+PARAM_DEFINE_FLOAT(PLD_HACC_RAD, 0.15f);
 
 /**
  * Final approach altitude
@@ -160,7 +160,7 @@ PARAM_DEFINE_INT32(PLD_MAX_SRCH, 3);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_P_XY_G, 3.5f);
+PARAM_DEFINE_FLOAT(PLD_P_XY_G, 3.0f);
 
 /**
  * Position I gain
@@ -171,7 +171,7 @@ PARAM_DEFINE_FLOAT(PLD_P_XY_G, 3.5f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_I_XY_G, 0.015f);
+PARAM_DEFINE_FLOAT(PLD_I_XY_G, 0.00f);
 
 /**
  * Position D gain
@@ -182,7 +182,7 @@ PARAM_DEFINE_FLOAT(PLD_I_XY_G, 0.015f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_D_XY_G, 1.3f);
+PARAM_DEFINE_FLOAT(PLD_D_XY_G, 0.8f);
 
 /**
  * Bound speed for position control in x direction
@@ -207,3 +207,16 @@ PARAM_DEFINE_FLOAT(PLD_I_X_B, 1.5f);
  * @group Precision Land
  */
 PARAM_DEFINE_FLOAT(PLD_I_Y_B, 2.5f);
+
+/**
+ * Land speed. Above 15m this number is doubled. Below 4 meters this number is halved.
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 5
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_V_LND, 1.5f);
+			       

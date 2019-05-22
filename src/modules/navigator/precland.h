@@ -153,10 +153,13 @@ private:
 	uint64_t _point_reached_time{0}; /**< time when we reached a setpoint */
 
 
+	orb_advert_t mavlink_log_pub = nullptr;
+
 	float angle_x_i_err = 0;
 	float angle_y_i_err = 0;
 	int no_v_diff_cnt;
 
+	int count_div = 0; // tmp
 
 	int _search_cnt{0}; /**< counter of how many times we had to search for the landing target */
 	float _approach_alt{0.0f}; /**< altitude at which to stay during horizontal approach */
@@ -186,6 +189,7 @@ private:
 			(ParamFloat<px4::params::PLD_D_XY_G>) _param_pld_d_xy_g,
 			(ParamFloat<px4::params::PLD_I_X_B>) _param_pld_i_x_b,
 			(ParamFloat<px4::params::PLD_I_Y_B>) _param_pld_i_y_b,
+			(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
 			(ParamFloat<px4::params::PLD_SRCH_TOUT>) _param_search_timeout,
 			(ParamInt<px4::params::PLD_MAX_SRCH>) _param_max_searches,
 			(ParamFloat<px4::params::MPC_ACC_HOR>) _param_acceleration_hor,

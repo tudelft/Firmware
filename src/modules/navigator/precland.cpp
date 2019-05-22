@@ -179,40 +179,53 @@ PrecLand::on_active()
 }
 
 void PrecLand::predict_target() {
-	uint64_t now = hrt_absolute_time();
-	float dt = (now - last_good_target_pose_time); //calc dt since the last time the target was seen
-	dt /= SEC2USEC;
+	count_div++;
+	float time_since_last_sighting = (hrt_absolute_time() - last_good_target_pose_time);
 	if(_target_pose_valid && _target_pose.rel_vel_valid && in_acceptance_range() ){
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
 
-		float max_land_speed = 2.f;
+		float a_max = 0.4f; //this is camera (fov) dependent
+		//is in the range of approx [0 - a_max], when it is 0 we want to descend as fast a possible.
+		//When it's a_max stop descending.
+
+
+		float max_land_speed = _param_pld_v_lnd.get();
 		float h = -_navigator->get_local_position()->z;
 		if (h>15)
-			max_land_speed = 4;
-		if (h<4)
-			max_land_speed = 0.7;
+			max_land_speed *= 2.f;
+		if (h<5)
+			max_land_speed *= 0.5f;
 
-		float land_speed = 1.f-(1.f/_param_hacc_rad.get())*a * max_land_speed;
-		if (land_speed > max_land_speed)
+		float land_speed;
+		if (a<0.05f)
 			land_speed = max_land_speed;
-		else if (land_speed<0.01f)
+		else if (a>0.35f)
 			land_speed = 0.01f;
+		else
+			land_speed = max_land_speed * (1.f/a_max) *(a_max-a);
+
 		land_speed_smthr.addSample(land_speed);
+		if (!(count_div % 12))
+			mavlink_log_info(&mavlink_log_pub, "Land speed %.2f x %.2f y %.2f H %.2f t %.2f", static_cast<double>(land_speed), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y), static_cast<double>(h),static_cast<double>(time_since_last_sighting));
 	} else {
+
+		if (!(count_div % 12))
+			mavlink_log_info(&mavlink_log_pub, "NOT IN LANDING ZONE %d %d %d t %.2f",_target_pose_valid , _target_pose.rel_vel_valid , in_acceptance_range(),static_cast<double>(time_since_last_sighting));
+
+
 		land_speed_smthr.addSample(0.f);
 	}
 //	std::cout << "angle: " << _target_pose.angle_x << ", " << _target_pose.angle_y
 //		  << " land speed: " << land_speed_smthr.get_latest() << std::endl;
 
 	if(_target_pose_valid && _target_pose.abs_pos_valid){
-		last_good_target_pose_time = now;
+		last_good_target_pose_time = hrt_absolute_time();
 	}
 }
 
 void
 PrecLand::run_state_start()
 {
-
 	angle_x_i_err = 0;
 	angle_y_i_err = 0;
 	no_v_diff_cnt =0;
@@ -267,7 +280,7 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 	float time_since_last_sighting = (now - last_good_target_pose_time);
 	time_since_last_sighting /= SEC2USEC;
 
-	if (time_since_last_sighting < 10 && _target_pose.rel_vel_valid) {
+	if (time_since_last_sighting < _param_timeout.get() && _target_pose.rel_vel_valid) {
 
 		pos_sp_triplet->current.lat = lat;
 		pos_sp_triplet->current.lon = lon;
@@ -312,6 +325,16 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 			float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
 			float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
+			//gain scheduling based on height. 100% gains above 50m height, no lower than 20%
+			float f = -_navigator->get_local_position()->z; //_target_pose.z_rel;
+			f = powf(f,1.2f);
+			f/= 50;
+			if (f>1)
+				f = 1;
+			else if (f<0.3f)
+				f = 0.3f;
+			ss_vx*=f;
+			ss_vy*=f;
 
 			if (ss_vx>i_x_bound) {
 				ss_vx = i_x_bound;
@@ -343,24 +366,6 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 //			  << " vel raw: "  << _target_pose.vx_abs << ", " << _target_pose.vy_abs
 //			  << " last sighting: " << time_since_last_sighting  << std::endl;
 
-	} else if (time_since_last_sighting > 10){ //TODO: weird, this flies back to some last seen location or something
-		pos_sp_triplet->current.lat = lat;
-		pos_sp_triplet->current.lon = lon;
-		pos_sp_triplet->current.vx = 0;
-		pos_sp_triplet->current.vy = 0;
-		pos_sp_triplet->current.velocity_valid = false;
-		pos_sp_triplet->current.position_valid = true;
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-		//PX4_WARN("Holding Position: %f, %f because last sighting: %f", static_cast<double>(lat) , static_cast<double>(lon),static_cast<double>(time_since_last_sighting) );
-		//todo: use other means to find the boat?
-	}
-
-	if (pos_sp_triplet->current.velocity_valid && time_since_last_sighting < 10 ) {
-		//if velocity control is enabled, disable position control unless the drone is in a small specific zone behind the marker, chasing the marker:
-		//this prevents the drone from flying towards the marker in the case that the marker is heading towards the drone already. (mitigating overshoot risk)
-		//todo:	implement.
-		//if (behind the target)
-		//	pos_sp_triplet->current.position_valid = false;
 	}
 
 	pos_sp_triplet->next.valid = false;
@@ -376,8 +381,9 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 		pos_sp_triplet->current.alt_valid = false;
 
 		//land into the direction of the marker (adjust horizontal speed):
-		float vxr = _target_pose.x_rel / _target_pose.z_rel;
-		float vyr = _target_pose.y_rel / _target_pose.z_rel;
+		float h = -_navigator->get_local_position()->z;
+		float vxr = _target_pose.x_rel / h;
+		float vyr = _target_pose.y_rel / h;
 		if (vxr > 1)
 			vxr = 1;
 		else if (vxr < -1)
@@ -386,8 +392,8 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 			vyr = 1;
 		else if (vyr < -1)
 			vyr = -1;
-		pos_sp_triplet->current.vx += vxr*pos_sp_triplet->current.vz;
-		pos_sp_triplet->current.vy += vyr*pos_sp_triplet->current.vz;
+		pos_sp_triplet->current.vx += vxr*land_speed_smthr.get_latest();
+		pos_sp_triplet->current.vy += vyr*land_speed_smthr.get_latest();
 
 	} else {
 		pos_sp_triplet->current.vz = 0;
@@ -504,7 +510,6 @@ PrecLand::run_state_search()
 			pos_sp_triplet->current.alt = new_alt < pos_sp_triplet->current.alt ? new_alt : pos_sp_triplet->current.alt;
 			_navigator->set_position_setpoint_triplet_updated();
 		}
-
 	}
 
 	// stay at that height for a second to allow the vehicle to settle
@@ -667,9 +672,9 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 					(_target_pose_valid && _target_pose.abs_pos_valid));
 
 			} else {
-				// We've seen the target sometime during horizontal approach. So, let's go there and see what we've got when we get there..
+				// We've seen the target sometime during horizontal approach. So, let's match speed and go there and see what we've got for at least 10 seconds
 				// So, even if we don't see it as we're moving towards it, continue approaching last known location (or the predicted new location if available)
-				return true;
+				return time_since_last_sighting < _param_timeout.get();
 			}
 		}
 
