@@ -316,10 +316,11 @@ void PrecLand::update_postriplet(float px, float py, bool land){
 		angle_y_prev = _target_pose.angle_y;
 		t_prev = _target_pose.timestamp;
 
-		no_v_diff_cnt++;
-		if (dv<1 && no_v_diff_cnt < 102 && _target_pose.abs_pos_valid)
+		int tresh = _param_v_diff_cnt_tresh.get();
+
+		if (dv<1 && no_v_diff_cnt < tresh+2 && _target_pose.abs_pos_valid)
 			no_v_diff_cnt++;
-		if (no_v_diff_cnt > 100){
+		if (no_v_diff_cnt > tresh){
 			angle_x_i_err+=_target_pose.angle_x;
 			angle_y_i_err+=_target_pose.angle_y;
 
@@ -645,7 +646,7 @@ PrecLand::switch_to_state_done()
 bool PrecLand::in_acceptance_range() {
 	if (_target_pose.abs_pos_valid) {
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
-		return (a<_param_hacc_rad.get() && no_v_diff_cnt>=100 );
+		return (a<_param_hacc_rad.get() && no_v_diff_cnt>=_param_v_diff_cnt_tresh.get() );
 	} else {
 		return false;
 	}

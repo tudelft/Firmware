@@ -192,6 +192,7 @@ private:
 			(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
 			(ParamFloat<px4::params::PLD_SRCH_TOUT>) _param_search_timeout,
 			(ParamInt<px4::params::PLD_MAX_SRCH>) _param_max_searches,
+			(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh,
 			(ParamFloat<px4::params::MPC_ACC_HOR>) _param_acceleration_hor,
 			(ParamFloat<px4::params::MPC_XY_CRUISE>) _param_xy_vel_cruise
 			)

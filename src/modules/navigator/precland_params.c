@@ -149,7 +149,16 @@ PARAM_DEFINE_FLOAT(PLD_SRCH_TOUT, 10.0f);
  */
 PARAM_DEFINE_INT32(PLD_MAX_SRCH, 3);
 
-
+/**
+ * v_diff_cnt_tresh
+ *
+ * Maximum number of times to seach for the landing target if it is lost during the precision landing.
+ *
+ * @min 5
+ * @max 1000
+ * @group Precision Land
+ */
+PARAM_DEFINE_INT32(PLD_VD_CNT, 100);
 
 /**
  * Position P gain
