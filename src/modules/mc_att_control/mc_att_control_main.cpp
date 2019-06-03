@@ -814,6 +814,17 @@ MulticopterAttitudeControl::run()
 							_actuators_0_pub = orb_advertise(_actuators_id, &_actuators);
 						}
 					}
+
+					/* Termination triggers the parachute */
+					_parachute_actuators.control[7] = 1.0f;
+					_parachute_actuators.timestamp = hrt_absolute_time();
+					_parachute_actuators.timestamp_sample = _sensor_gyro.timestamp;
+					if (_actuators_2_pub != nullptr) {
+						orb_publish(ORB_ID(actuator_controls_2), _actuators_2_pub, &_parachute_actuators);
+					} else {
+						_actuators_2_pub = orb_advertise(ORB_ID(actuator_controls_2), &_actuators_2_pub);
+					}
+
 				}
 			}
 

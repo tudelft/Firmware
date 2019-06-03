@@ -142,10 +142,12 @@ private:
 
 	orb_advert_t	_v_rates_sp_pub{nullptr};		/**< rate setpoint publication */
 	orb_advert_t	_actuators_0_pub{nullptr};		/**< attitude actuator controls publication */
+	orb_advert_t	_actuators_2_pub{nullptr};		/**< parachute channel publication */
 	orb_advert_t	_controller_status_pub{nullptr};	/**< controller status publication */
 
 	orb_id_t _rates_sp_id{nullptr};		/**< pointer to correct rates setpoint uORB metadata structure */
 	orb_id_t _actuators_id{nullptr};	/**< pointer to correct actuator controls0 uORB metadata structure */
+	orb_id_t _parachute_actuators_id{nullptr}; /**< pointer to actuator_controls_2 for parachute channel */
 
 	bool		_actuators_0_circuit_breaker_enabled{false};	/**< circuit breaker to suppress output */
 
@@ -155,6 +157,7 @@ private:
 	struct manual_control_setpoint_s	_manual_control_sp {};	/**< manual control setpoint */
 	struct vehicle_control_mode_s		_v_control_mode {};	/**< vehicle control mode */
 	struct actuator_controls_s		_actuators {};		/**< actuator controls */
+	struct actuator_controls_s		_parachute_actuators {};/**< parachute controls */
 	struct vehicle_status_s			_vehicle_status {};	/**< vehicle status */
 	struct battery_status_s			_battery_status {};	/**< battery status */
 	struct sensor_gyro_s			_sensor_gyro {};	/**< gyro data before thermal correctons and ekf bias estimates are applied */
