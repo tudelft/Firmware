@@ -57,6 +57,7 @@
 #include <drivers/drv_hrt.h>
 #include <systemlib/hysteresis/hysteresis.h>
 
+#include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/home_position.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
@@ -116,6 +117,7 @@ private:
 
 	/** Time in us that direction change condition has to be true for direction change state */
 	static constexpr uint64_t DIRECTION_CHANGE_TRIGGER_TIME_US = 100000;
+	static constexpr uint64_t TERMINATE_ON_RAPID_DESCEND_TRIGGER_TIME_US = 1000000;
 
 	bool		_task_should_exit = false;			/**<true if task should exit */
 	bool		_gear_state_initialized = false;		/**<true if the gear state has been initialized */
@@ -150,6 +152,7 @@ private:
 	int		_local_pos_sub;			/**< vehicle local position */
 	int		_pos_sp_triplet_sub;		/**< position setpoint triplet */
 	int		_home_pos_sub; 			/**< home position */
+	int		_actuator_armed_sub;		/**< actuator armed */
 
 	orb_advert_t	_att_sp_pub;			/**< attitude setpoint publication */
 	orb_advert_t	_local_pos_sp_pub;		/**< vehicle local position setpoint publication */
@@ -166,6 +169,7 @@ private:
 	struct position_setpoint_triplet_s		_pos_sp_triplet;	/**< vehicle global position setpoint triplet */
 	struct vehicle_local_position_setpoint_s	_local_pos_sp;		/**< vehicle local position setpoint */
 	struct home_position_s				_home_pos; 				/**< home position */
+	struct actuator_armed_s				_actuator_armed;	/**< actuator armed status */
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MPC_FLT_TSK>) _test_flight_tasks, /**< temporary flag for the transition to flight tasks */
@@ -229,7 +233,9 @@ private:
 		(ParamInt<px4::params::MPC_ALT_MODE>) _alt_mode,
 		(ParamFloat<px4::params::RC_FLT_CUTOFF>) _rc_flt_cutoff,
 		(ParamFloat<px4::params::RC_FLT_SMP_RATE>) _rc_flt_smp_rate,
-		(ParamFloat<px4::params::MPC_ACC_HOR_ESTM>) _acc_max_estimator_xy
+		(ParamFloat<px4::params::MPC_ACC_HOR_ESTM>) _acc_max_estimator_xy,
+
+		(ParamFloat<px4::params::MPC_TERMINATE_VZ>) _terminate_vz
 
 	);
 
@@ -243,6 +249,7 @@ private:
 	PositionControl _control{}; /**< class handling the core PID position controller */
 
 	systemlib::Hysteresis _manual_direction_change_hysteresis;
+	systemlib::Hysteresis _terminate_on_rapid_descend_hysteresis;
 
 	math::LowPassFilter2p _filter_manual_pitch;
 	math::LowPassFilter2p _filter_manual_roll;
@@ -447,6 +454,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_local_pos_sub(-1),
 	_pos_sp_triplet_sub(-1),
 	_home_pos_sub(-1),
+	_actuator_armed_sub(-1),
 
 	/* publications */
 	_att_sp_pub(nullptr),
@@ -462,10 +470,12 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_pos_sp_triplet{},
 	_local_pos_sp{},
 	_home_pos{},
+	_actuator_armed{},
 	_vel_x_deriv(this, "VELD"),
 	_vel_y_deriv(this, "VELD"),
 	_vel_z_deriv(this, "VELD"),
 	_manual_direction_change_hysteresis(false),
+	_terminate_on_rapid_descend_hysteresis(false),
 	_filter_manual_pitch(50.0f, 10.0f),
 	_filter_manual_roll(50.0f, 10.0f),
 	_user_intention_xy(brake),
@@ -496,6 +506,9 @@ MulticopterPositionControl::MulticopterPositionControl() :
 
 	/* set trigger time for manual direction change detection */
 	_manual_direction_change_hysteresis.set_hysteresis_time_from(false, DIRECTION_CHANGE_TRIGGER_TIME_US);
+
+	/* set trigger time for rapid descend terminate */
+	_terminate_on_rapid_descend_hysteresis.set_hysteresis_time_from(false, TERMINATE_ON_RAPID_DESCEND_TRIGGER_TIME_US);
 
 	_pos.zero();
 	_pos_sp.zero();
@@ -751,6 +764,12 @@ MulticopterPositionControl::poll_subscriptions()
 
 	if (updated) {
 		orb_copy(ORB_ID(home_position), _home_pos_sub, &_home_pos);
+	}
+
+	orb_check(_actuator_armed_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(actuator_armed), _actuator_armed_sub, &_actuator_armed);
 	}
 }
 
@@ -1412,6 +1431,16 @@ MulticopterPositionControl::control_non_manual()
 
 		/* AUTO */
 		control_auto();
+	}
+
+	// if descending rapidly for some period of time, terminate flight
+	bool terminate_condition = _vel(2) > _terminate_vz.get()
+			&& _terminate_vz.get() > 0.0f
+			&& !_actuator_armed.force_failsafe;
+	_terminate_on_rapid_descend_hysteresis.set_state_and_update(terminate_condition);
+	if (_terminate_on_rapid_descend_hysteresis.get_state()) {
+		PX4_INFO("Terminate!");
+		send_flight_termination_command();
 	}
 
 	// guard against any bad velocity values
@@ -2941,6 +2970,7 @@ MulticopterPositionControl::task_main()
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_home_pos_sub = orb_subscribe(ORB_ID(home_position));
+	_actuator_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
 
 	parameters_update(true);
 
@@ -3221,6 +3251,9 @@ MulticopterPositionControl::task_main()
 
 				/* store last velocity in case a mode switch to position control occurs */
 				_vel_sp_prev = _vel;
+
+				/* reset terminate on rapid descend hysteresis. */
+				_terminate_on_rapid_descend_hysteresis.set_state_and_update(false);
 			}
 
 			/* generate attitude setpoint from manual controls */

@@ -603,3 +603,15 @@ PARAM_DEFINE_FLOAT(MPC_TKO_RAMP_T, 0.4f);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_INT32(MPC_FLT_TSK, 0);
+
+/**
+ * Rapid descend terminate velocity
+ *
+ * Flight is terminated when this vertical velociy is reached in auto flight.
+ * Set to -1.0 to disable functionality.
+ *
+ * @min -1
+ * @max 10
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_TERMINATE_VZ, 5.0f);
