@@ -412,6 +412,11 @@ private:
 	void publish_local_pos_sp();
 
 	/**
+	 * Vutura flight termination with parachute
+	 */
+	void send_flight_termination_command();
+
+	/**
 	 * Shim for calling task_main from task_create.
 	 */
 	static int	task_main_trampoline(int argc, char *argv[]);
@@ -2891,6 +2896,11 @@ MulticopterPositionControl::generate_attitude_setpoint()
 	    !_vehicle_land_detected.landed) {
 		_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_UP;
 
+		// TERMINATE FLIGHT, DEPLOY PARACHUTE
+		if (!_control_mode.flag_control_termination_enabled) {
+			send_flight_termination_command();
+		}
+
 	} else if (_manual.gear_switch == manual_control_setpoint_s::SWITCH_POS_OFF) {
 		_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN;
 		// Switching the gear off does put it into a safe defined state
@@ -3307,6 +3317,27 @@ MulticopterPositionControl::publish_local_pos_sp()
 					    ORB_ID(vehicle_local_position_setpoint),
 					    &_local_pos_sp);
 	}
+}
+
+void MulticopterPositionControl::send_flight_termination_command()
+{
+	struct vehicle_command_s cmd = {
+		.timestamp = 0,
+		.param5 = 0.0f,
+		.param6 = 0.0f,
+
+		.param1 = 1.0f, /* terminate */
+		.param2 = 0.0f,
+		.param3 = 0.0f,
+		.param4 = 0.0f,
+		.param7 = 0.0f,
+		.command = vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION,
+		.target_system = _vehicle_status.system_id,
+		.target_component = _vehicle_status.component_id
+	};
+
+	orb_advert_t h = orb_advertise_queue(ORB_ID(vehicle_command), &cmd, vehicle_command_s::ORB_QUEUE_LENGTH);
+	(void)orb_unadvertise(h);
 }
 
 void

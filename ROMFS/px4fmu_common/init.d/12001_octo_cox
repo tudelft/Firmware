@@ -17,7 +17,21 @@
 # @maintainer Lorenz Meier <lorenz@px4.io>
 #
 
-sh /etc/init.d/rc.mc_defaults
+# not using defaults for vutura
+# sh /etc/init.d/rc.mc_defaults
+set VEHICLE_TYPE mc
+
+if [ $AUTOCNF == yes ]
+then
+	param set PWM_MIN 1075
+	param set PWM_MAX 1950
+	param set PWM_RATE 400
+fi
+
+# parachute mixer
+set MIXER_AUX parachute
+set PWM_AUX_RATE 50
+set PWM_AUX_OUT 1
 
 set MIXER octo_cox
 
