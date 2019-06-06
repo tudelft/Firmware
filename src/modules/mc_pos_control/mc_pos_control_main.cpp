@@ -1433,6 +1433,7 @@ MulticopterPositionControl::control_non_manual()
 		control_auto();
 	}
 
+	/*
 	// if descending rapidly for some period of time, terminate flight
 	bool terminate_condition = _vel(2) > _terminate_vz.get()
 			&& _terminate_vz.get() > 0.0f
@@ -1442,6 +1443,7 @@ MulticopterPositionControl::control_non_manual()
 		PX4_INFO("Terminate!");
 		send_flight_termination_command();
 	}
+	*/
 
 	// guard against any bad velocity values
 	bool velocity_valid = PX4_ISFINITE(_pos_sp_triplet.current.vx) &&
@@ -2925,10 +2927,12 @@ MulticopterPositionControl::generate_attitude_setpoint()
 	    !_vehicle_land_detected.landed) {
 		_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_UP;
 
+		/*
 		// TERMINATE FLIGHT, DEPLOY PARACHUTE
 		if (!_control_mode.flag_control_termination_enabled) {
 			send_flight_termination_command();
 		}
+		*/
 
 	} else if (_manual.gear_switch == manual_control_setpoint_s::SWITCH_POS_OFF) {
 		_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN;
