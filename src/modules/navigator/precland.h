@@ -44,6 +44,7 @@
 #include <lib/ecl/geo/geo.h>
 #include <px4_module_params.h>
 #include <uORB/topics/landing_target_pose.h>
+#include <uORB/topics/distance_sensor.h>
 
 #include "navigator_mode.h"
 #include "mission_block.h"
@@ -84,12 +85,8 @@ class Smoother
 
 
 enum class PrecLandState {
-	Start, // Starting state
-	HorizontalApproach, // Positioning over landing target while maintaining altitude
-	DescendAboveTarget, // Stay over landing target while descending
-	FinalApproach, // Final landing approach, even without landing target
 	Search, // Search for landing target
-	Fallback, // Fallback landing method
+	HorizontalApproach, // Positioning over landing target while maintaining altitude
 	Done // Done landing
 };
 
@@ -115,35 +112,31 @@ public:
 
 private:
 	// run the control loop for each state
-	void run_state_start();
 	void run_state_horizontal_approach();
-	void run_state_descend_above_target();
-	void run_state_final_approach();
 	void run_state_search();
-	void run_state_fallback();
 
-	void update_postriplet(float px, float py, bool land);
+	void update_postriplet(float px, float py);
 	bool in_acceptance_range();
 
 	// attempt to switch to a different state. Returns true if state change was successful, false otherwise
-	bool switch_to_state_start();
 	bool switch_to_state_horizontal_approach();
-	bool switch_to_state_descend_above_target();
-	bool switch_to_state_final_approach();
 	bool switch_to_state_search();
-	bool switch_to_state_fallback();
 	bool switch_to_state_done();
 
 	// check if a given state could be changed into. Return true if possible to transition to state, false otherwise
 	bool check_state_conditions(PrecLandState state);
-	void slewrate(float &sp_x, float &sp_y);
 	void predict_target();
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
 
+	distance_sensor_s ds_report = {};
+
 	int _target_pose_sub{-1};
 	bool _target_pose_valid{false}; /**< whether we have received a landing target position message */
 	bool _target_pose_updated{false}; /**< wether the landing target position message is updated */
+
+	int _stereo_height_sub{-1};
+	bool _stereo_height_updated{false}; /**< wether the height message is updated */
 
 	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
@@ -167,12 +160,12 @@ private:
 	matrix::Vector2f _sp_pev;
 	matrix::Vector2f _sp_pev_prev;
 
-	Smoother land_speed_smthr, vx_smthr,vy_smthr,d_angle_x_smthr,d_angle_y_smthr;
+	Smoother land_speed_smthr, vx_smthr,vy_smthr,d_angle_x_smthr,d_angle_y_smthr,boat_wave_z_speed_smthr;
 	float last_good_target_pose_x;
 	float last_good_target_pose_y;
 	uint64_t last_good_target_pose_time;
 
-	PrecLandState _state{PrecLandState::Start};
+	PrecLandState _state{PrecLandState::Search};
 
 	PrecLandMode _mode{PrecLandMode::Required};
 
