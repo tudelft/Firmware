@@ -31,7 +31,7 @@ fi
 # parachute mixer
 set MIXER_AUX parachute
 set PWM_AUX_RATE 50
-set PWM_AUX_OUT 1
+set PWM_AUX_OUT 12345678
 set PWM_AUX_DISARMED 1000
 set FAILSAFE_AUX 1950
 
