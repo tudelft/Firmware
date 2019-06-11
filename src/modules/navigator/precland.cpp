@@ -459,8 +459,8 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 
 void Smoother::init(int width, float value)
 {
-	if (width > 1000)
-		width = 1000;
+	if (width > 199)
+		width = 199;
 	_kernelsize = width;
 //	_rbuf.resize(_kernelsize + 1);
 	_rotater = 0;
