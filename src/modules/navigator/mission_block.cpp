@@ -124,7 +124,7 @@ MissionBlock::is_mission_item_reached()
 
 	hrt_abstime now = hrt_absolute_time();
 
-	if (!_navigator->get_land_detected()->landed && !_waypoint_position_reached) {
+	if ((!_navigator->get_land_detected()->landed || _mission_item.nav_cmd == NAV_CMD_DELAY) && !_waypoint_position_reached) {
 
 		float dist = -1.0f;
 		float dist_xy = -1.0f;
