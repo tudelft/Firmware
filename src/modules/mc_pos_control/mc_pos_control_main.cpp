@@ -3424,23 +3424,10 @@ void
 MulticopterPositionControl::landdetection_thrust_limit(matrix::Vector3f &thrust_sp)
 {
 	if (!in_auto_takeoff() && !manual_wants_takeoff()) {
-		if (_vehicle_land_detected.ground_contact) {
-			/* if still or already on ground command zero xy thrust_sp in body
-			 * frame to consider uneven ground */
 
-			/* thrust setpoint in body frame*/
-			matrix::Vector3f thrust_sp_body = _R.transpose() * thrust_sp;
-
-			/* we dont want to make any correction in body x and y*/
-			thrust_sp_body(0) = 0.0f;
-			thrust_sp_body(1) = 0.0f;
-
-			/* make sure z component of thrust_sp_body is larger than 0 (positive thrust is downward) */
-			thrust_sp_body(2) = thrust_sp(2) > 0.0f ? thrust_sp(2) : 0.0f;
-
-			/* convert back to local frame (NED) */
-			thrust_sp = _R * thrust_sp_body;
-		}
+		// Removed.
+		// Don't limit thrust on ground contact.
+		// Should prevent drops in air, but makes land detector worse.
 
 		if (_vehicle_land_detected.maybe_landed) {
 			/* we set thrust to zero
