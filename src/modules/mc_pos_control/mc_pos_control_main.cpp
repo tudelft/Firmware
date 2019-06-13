@@ -1486,7 +1486,13 @@ MulticopterPositionControl::control_non_manual()
 	/* use constant descend rate when landing, ignore altitude setpoint */
 	if (_pos_sp_triplet.current.valid
 	    && _pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND) {
-		_vel_sp(2) = _land_speed.get();
+		// when landing, start with reasonable descend velocity
+		float altitude_above_home = -_pos(2) + _home_pos.z;
+		_vel_sp(2) = math::gradual(altitude_above_home,
+						_slow_land_alt2.get(), _slow_land_alt1.get(),
+						_land_speed.get(), _vel_max_down.get());
+
+		//_vel_sp(2) = _land_speed.get();
 		_run_alt_control = false;
 	}
 
