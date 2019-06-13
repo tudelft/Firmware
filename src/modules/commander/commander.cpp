@@ -2221,6 +2221,7 @@ Commander::run()
 
 			/* handle the case where RC signal was regained */
 			if (!status_flags.rc_signal_found_once) {
+				mavlink_log_info(&mavlink_log_pub, "GOT RC");
 				status_flags.rc_signal_found_once = true;
 				set_health_flags(subsystem_info_s::SUBSYSTEM_TYPE_RCRECEIVER, true, true, true && status_flags.rc_calibration_valid, status);
 				status_changed = true;
