@@ -56,7 +56,7 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 
-#include <iostream>
+//#include <iostream>
 
 #define SEC2USEC 1000000.0f
 
@@ -226,16 +226,15 @@ void PrecLand::init_search_triplet() {
 
 void PrecLand::update_land_speed() {
 
-	std::cout << "t " << time_since_last_sighting;
+//	std::cout << "t " << time_since_last_sighting;
 	if(in_acceptance_range() && time_since_last_sighting < 1.f ){
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
 
-		std::cout << " a: " << a;
+//		std::cout << " a: " << a;
 
 		float a_max = 0.4f; //this is camera (fov) dependent
 		//is in the range of approx [0 - a_max], when it is 0 we want to descend as fast a possible.
 		//When it's a_max stop descending.
-
 
 		float max_land_speed = _param_pld_v_lnd.get();
 		float h = -_navigator->get_local_position()->z;
@@ -273,7 +272,7 @@ void PrecLand::update_land_speed() {
 
 		land_speed_smthr.addSample(0.f);
 	}
-	std::cout << std::endl;
+//	std::cout << std::endl;
 }
 
 void PrecLand::update_approach() {
@@ -323,7 +322,7 @@ void PrecLand::update_approach() {
 	if (dv<1 && no_v_diff_cnt < tresh+2 && _target_pose.abs_pos_valid && _target_pose_updated)
 		no_v_diff_cnt++;
 	if (no_v_diff_cnt > tresh){
-		std::cout << "pos control, vz:" << land_speed_smthr.get_latest() << std::endl;
+//		std::cout << "pos control, vz:" << land_speed_smthr.get_latest() << std::endl;
 		angle_x_i_err+=_target_pose.angle_x;
 		angle_y_i_err+=_target_pose.angle_y;
 
