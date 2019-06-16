@@ -277,6 +277,10 @@ void PrecLand::update_land_speed() {
 
 void PrecLand::update_approach() {
 
+	static uint64_t t_prev = 0;
+	if (t_prev == _target_pose.timestamp)
+		return;
+
 	update_land_speed();
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
@@ -300,7 +304,6 @@ void PrecLand::update_approach() {
 
 	static float angle_x_prev = _target_pose.angle_x;
 	static float angle_y_prev = _target_pose.angle_y;
-	static uint64_t t_prev = 0;
 
 	float dt = (_target_pose.timestamp - t_prev ) / 1e6f;
 
