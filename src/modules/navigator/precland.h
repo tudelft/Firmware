@@ -51,43 +51,75 @@
 
 #include <vector>
 
-
-
-
 /*
  * This class performs moving average filtering
  *
  */
-class Smoother
+class Smoother_100
 {
-
+#define SMOOTHER_100_WIDTH 100
   private:
-	matrix::Vector<float,200> _rbuf; // rotary buffer
+	matrix::Vector<float,SMOOTHER_100_WIDTH+1> _rbuf; // rotary buffer
 	int _kernelsize;          // filter kernel width
 	int _rotater;             //pointer to current sample in rotary buffer
 	float _runner;            // current filter output value
 	bool _ready = false;
 
   public:
-	void init(int width);
-	void init(int width, float value);
+	Smoother_100() {
+		_kernelsize = SMOOTHER_100_WIDTH;
+	}
+	void init();
+	void init(float value);
 	float addSample(float sample);
 	float get_latest();
 	void reset(void);
 	void reset_to(float v);
-	bool ready()
-	{
+	bool ready() {
+		return _ready;
+	}
+	int kernselsize() { return _kernelsize;}
+};
+
+/*
+ * This class performs moving average filtering
+ *
+ */
+class Smoother_10
+{
+#define SMOOTHER_10_WIDTH 10
+  private:
+	matrix::Vector<float,SMOOTHER_10_WIDTH+1> _rbuf; // rotary buffer
+	int _kernelsize;          // filter kernel width
+	int _rotater;             //pointer to current sample in rotary buffer
+	float _runner;            // current filter output value
+	bool _ready = false;
+
+  public:
+	Smoother_10() {
+		_kernelsize = SMOOTHER_10_WIDTH;
+	}
+	void init();
+	void init(float value);
+	float addSample(float sample);
+	float get_latest();
+	void reset(void);
+	void reset_to(float v);
+	bool ready() {
 		return _ready;
 	}
 	int kernselsize() { return _kernelsize;}
 };
 
 
-
 enum class PrecLandState {
-	Search, // Search for landing target
-	HorizontalApproach, // Positioning over landing target while maintaining altitude
-	Done // Done landing
+	InitSearch,
+	WaitForTarget,
+	InitApproach,
+	RunApproach,
+	InitLost,
+	RunLost,
+	Done
 };
 
 enum class PrecLandMode {
@@ -111,83 +143,46 @@ public:
 	PrecLandMode get_mode() { return _mode; };
 
 private:
-	// run the control loop for each state
-	void run_state_horizontal_approach();
-	void run_state_search();
-
-	void update_postriplet(float px, float py);
+	void init_search_triplet();
+	void update_land_speed();
+	void update_approach();
 	bool in_acceptance_range();
-
-	// attempt to switch to a different state. Returns true if state change was successful, false otherwise
-	bool switch_to_state_horizontal_approach();
-	bool switch_to_state_search();
-	bool switch_to_state_done();
-
-	// check if a given state could be changed into. Return true if possible to transition to state, false otherwise
-	bool check_state_conditions(PrecLandState state);
-	void predict_target();
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
 
-	distance_sensor_s ds_report = {};
-
 	int _target_pose_sub{-1};
-	bool _target_pose_valid{false}; /**< whether we have received a landing target position message */
+	bool _target_pose_initialised{false}; /**< whether we have received a landing target position message */
 	bool _target_pose_updated{false}; /**< wether the landing target position message is updated */
-
-	int _stereo_height_sub{-1};
-	bool _stereo_height_updated{false}; /**< wether the height message is updated */
-
 	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
-	uint64_t _state_start_time{0}; /**< time when we entered current state */
-	uint64_t _last_slewrate_time{0}; /**< time when we last limited setpoint changes */
-	uint64_t _target_acquired_time{0}; /**< time when we first saw the landing target during search */
-	uint64_t _point_reached_time{0}; /**< time when we reached a setpoint */
+	Smoother_10 d_angle_x_smthr,d_angle_y_smthr;
 
-
-	orb_advert_t mavlink_log_pub = nullptr;
-
-	float angle_x_i_err = 0;
+	float angle_x_i_err = 0; //TODO: i controller may not be needed. Remove?
 	float angle_y_i_err = 0;
 	int no_v_diff_cnt;
+	float time_since_last_sighting = 999;
+	Smoother_100 land_speed_smthr, vx_smthr,vy_smthr;
 
-	int count_div = 0; // tmp
+	int debug_msg_div = 0; // divider counter to limit debug messages
+	orb_advert_t mavlink_log_pub = nullptr;
 
-	int _search_cnt{0}; /**< counter of how many times we had to search for the landing target */
-	float _approach_alt{0.0f}; /**< altitude at which to stay during horizontal approach */
-
-	matrix::Vector2f _sp_pev;
-	matrix::Vector2f _sp_pev_prev;
-
-	Smoother land_speed_smthr, vx_smthr,vy_smthr,d_angle_x_smthr,d_angle_y_smthr,boat_wave_z_speed_smthr;
-	float last_good_target_pose_x;
-	float last_good_target_pose_y;
-	uint64_t last_good_target_pose_time;
-
-	PrecLandState _state{PrecLandState::Search};
+	PrecLandState _state{PrecLandState::InitSearch};
 
 	PrecLandMode _mode{PrecLandMode::Required};
 
 	DEFINE_PARAMETERS(
-			(ParamFloat<px4::params::PLD_BTOUT>) _param_timeout,
+			(ParamFloat<px4::params::PLD_TLST_TOUT>) _param_target_lost_timeout,
+			(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
 			(ParamFloat<px4::params::PLD_HACC_RAD>) _param_hacc_rad,
 			(ParamFloat<px4::params::PLD_FAPPR_ALT>) _param_final_approach_alt,
-			(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
 			(ParamInt<px4::params::PLD_ONLY_FLW>) _param_only_flw,
-			(ParamInt<px4::params::PLD_FLW_TOUT>) _param_flw_tout,
-			(ParamInt<px4::params::PLD_SMT_WDT>) _param_smt_wdt,
-			(ParamFloat<px4::params::PLD_P_XY_G>) _param_pld_p_xy_g,
-			(ParamFloat<px4::params::PLD_I_XY_G>) _param_pld_i_xy_g,
-			(ParamFloat<px4::params::PLD_D_XY_G>) _param_pld_d_xy_g,
-			(ParamFloat<px4::params::PLD_I_X_B>) _param_pld_i_x_b,
-			(ParamFloat<px4::params::PLD_I_Y_B>) _param_pld_i_y_b,
+			(ParamFloat<px4::params::PLD_XY_G_P>) _param_pld_xy_g_p,
+			(ParamFloat<px4::params::PLD_XY_G_I>) _param_pld_xy_g_i,
+			(ParamFloat<px4::params::PLD_XY_G_D>) _param_pld_xy_g_d,
+			(ParamFloat<px4::params::PLD_X_BI>) _param_pld_x_bi,
+			(ParamFloat<px4::params::PLD_Y_BI>) _param_pld_y_bi,
 			(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
-			(ParamFloat<px4::params::PLD_SRCH_TOUT>) _param_search_timeout,
-			(ParamInt<px4::params::PLD_MAX_SRCH>) _param_max_searches,
-			(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh,
-			(ParamFloat<px4::params::MPC_ACC_HOR>) _param_acceleration_hor,
-			(ParamFloat<px4::params::MPC_XY_CRUISE>) _param_xy_vel_cruise
+			(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh
 			)
 
 };

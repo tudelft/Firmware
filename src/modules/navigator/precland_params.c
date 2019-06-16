@@ -51,12 +51,26 @@
  * @increment 0.5
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_BTOUT, 10.0f);
+PARAM_DEFINE_FLOAT(PLD_TLST_TOUT, 10.0f);
+
+/**
+ * Search altitude
+ *
+ * Altitude above home to which to climb when searching for the landing target.
+ *
+ * @unit m
+ * @min 0.0
+ * @max 100
+ * @decimal 1
+ * @increment 0.1
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_SRCH_ALT, 10.0f);
 
 /**
  * Horizontal acceptance radius
  *
- * Start descending if closer above landing target than this.
+ * Start descending if target in the center of image.
  *
  * @min 0.0
  * @max 0.64
@@ -81,21 +95,7 @@ PARAM_DEFINE_FLOAT(PLD_HACC_RAD, 0.15f);
 PARAM_DEFINE_FLOAT(PLD_FAPPR_ALT, 0.1f);
 
 /**
- * Search altitude
- *
- * Altitude above home to which to climb when searching for the landing target.
- *
- * @unit m
- * @min 0.0
- * @max 100
- * @decimal 1
- * @increment 0.1
- * @group Precision Land
- */
-PARAM_DEFINE_FLOAT(PLD_SRCH_ALT, 10.0f);
-
-/**
- * Only follow
+ * Only follow, don't descend
  *
  * @boolean
  * @group System
@@ -103,56 +103,8 @@ PARAM_DEFINE_FLOAT(PLD_SRCH_ALT, 10.0f);
 PARAM_DEFINE_INT32(PLD_ONLY_FLW, 0);
 
 /**
- * Time out during horizontal approach. 
- *
- * Max time that the target is lost seen and predicted based on the v esitmate.
- *
- * @min 1000
- * @max 30000000
- * @group Precision Land
- */
-PARAM_DEFINE_INT32(PLD_FLW_TOUT, 10000000);
-
-/**
- * Smoothing filter width velocity predition target
- *
- * For the predition of the movement of the target, a smoothing filter is used.
- *
- * @min 1
- * @max 5000
- * @group Precision Land
- */
-PARAM_DEFINE_INT32(PLD_SMT_WDT, 100);
-
-/**
- * Search timeout
- *
- * Time allowed to search for the landing target before falling back to normal landing.
- *
- * @unit s
- * @min 0.0
- * @max 100
- * @decimal 1
- * @increment 0.1
- * @group Precision Land
- */
-PARAM_DEFINE_FLOAT(PLD_SRCH_TOUT, 10.0f);
-
-/**
- * Maximum number of search attempts
- *
- * Maximum number of times to seach for the landing target if it is lost during the precision landing.
- *
- * @min 0
- * @max 100
- * @group Precision Land
- */
-PARAM_DEFINE_INT32(PLD_MAX_SRCH, 3);
-
-/**
  * v_diff_cnt_tresh
  *
- * Maximum number of times to seach for the landing target if it is lost during the precision landing.
  *
  * @min 5
  * @max 1000
@@ -169,7 +121,7 @@ PARAM_DEFINE_INT32(PLD_VD_CNT, 100);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_P_XY_G, 3.0f);
+PARAM_DEFINE_FLOAT(PLD_XY_G_P, 3.0f);
 
 /**
  * Position I gain
@@ -180,7 +132,7 @@ PARAM_DEFINE_FLOAT(PLD_P_XY_G, 3.0f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_I_XY_G, 0.00f);
+PARAM_DEFINE_FLOAT(PLD_XY_G_I, 0.00f);
 
 /**
  * Position D gain
@@ -191,7 +143,7 @@ PARAM_DEFINE_FLOAT(PLD_I_XY_G, 0.00f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_D_XY_G, 0.8f);
+PARAM_DEFINE_FLOAT(PLD_XY_G_D, 0.8f);
 
 /**
  * Bound speed for position control in x direction
@@ -203,7 +155,7 @@ PARAM_DEFINE_FLOAT(PLD_D_XY_G, 0.8f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_I_X_B, 1.5f);
+PARAM_DEFINE_FLOAT(PLD_X_BI, 1.5f);
 
 /**
  * Bound speed for position control in y direction
@@ -215,7 +167,7 @@ PARAM_DEFINE_FLOAT(PLD_I_X_B, 1.5f);
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_I_Y_B, 2.5f);
+PARAM_DEFINE_FLOAT(PLD_Y_BI, 2.5f);
 
 /**
  * Land speed. Above 15m this number is doubled. Below 4 meters this number is halved.
@@ -228,4 +180,3 @@ PARAM_DEFINE_FLOAT(PLD_I_Y_B, 2.5f);
  * @group Precision Land
  */
 PARAM_DEFINE_FLOAT(PLD_V_LND, 1.5f);
-			       

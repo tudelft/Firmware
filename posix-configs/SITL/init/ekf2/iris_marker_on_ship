@@ -47,8 +47,6 @@ param set SYS_MC_EST_GROUP 2
 param set SYS_RESTART_TYPE 2
 
 param set NAV_DLL_ACT 0
-param set PLD_MAX_SRCH 100
-param set PLD_SRCH_TOUT 1000
 
 replay tryapplyparams
 simulator start -s
