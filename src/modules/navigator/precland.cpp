@@ -171,6 +171,8 @@ PrecLand::on_active()
 				pos_sp_triplet->current.vx = vx_smthr.get_latest()*2;
 				pos_sp_triplet->current.vy = vy_smthr.get_latest()*2;
 			}
+
+			//pos_sp_triplet->current.alt = _navigator->get_global_position()->alt - land_speed_smthr.get_latest() ;
 			pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 			pos_sp_triplet->current.alt_valid = false;
 
@@ -364,6 +366,7 @@ void PrecLand::update_approach() {
 		pos_sp_triplet->current.vy +=ss_vy;
 	}
 
+//	pos_sp_triplet->current.alt = _navigator->get_global_position()->alt - land_speed_smthr.get_latest() ;
 	pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 	pos_sp_triplet->current.alt_valid = false;
 
