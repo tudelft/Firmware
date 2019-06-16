@@ -40,7 +40,7 @@
  */
 
 /**
- * Landing Target Timeout
+ * Landing Target Lost Timeout
  *
  * Time after which the landing target is considered lost without any new measurements.
  *
@@ -51,7 +51,21 @@
  * @increment 0.5
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_TLST_TOUT, 10.0f);
+PARAM_DEFINE_FLOAT(PLD_TLST_TOUT, 3.0f);
+
+/**
+ * Landing Target Really Lost Timeout
+ *
+ * Time after which the landing target is considered really lost after which the search is reset
+ *
+ * @unit s
+ * @min 0.0
+ * @max 120
+ * @decimal 1
+ * @increment 0.5
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_RLST_TOUT, 20.0f);
 
 /**
  * Search altitude

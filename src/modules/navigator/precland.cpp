@@ -114,7 +114,7 @@ PrecLand::on_active()
 			time_since_last_sighting /= SEC2USEC;
 		}
 	} else
-		time_since_last_sighting = 2* _param_target_lost_timeout.get();
+		time_since_last_sighting = 2* _param_target_really_lost_timeout.get();
 
 	// stop if we are landed
 	if (_navigator->get_land_detected()->landed) {
@@ -143,7 +143,7 @@ PrecLand::on_active()
 		// fallthrough
 	} case PrecLandState::RunApproach: {
 		// check if target visible
-		if (time_since_last_sighting < _param_target_lost_timeout.get()/3.f) {
+		if (time_since_last_sighting < _param_target_lost_timeout.get()) {
 			update_approach();
 			break;
 		} else
@@ -182,7 +182,7 @@ PrecLand::on_active()
 			_navigator->set_position_setpoint_triplet_updated();
 		}
 
-		if (time_since_last_sighting > _param_target_lost_timeout.get())
+		if (time_since_last_sighting > _param_target_really_lost_timeout.get())
 			_state = PrecLandState::InitSearch;
 
 		break;
@@ -267,7 +267,7 @@ void PrecLand::update_land_speed() {
 			if (pos_control_enabled){
 				mavlink_log_info(&mavlink_log_pub, "Catching up %d %d %d x %.2f y %.2f",_target_pose_initialised , _target_pose.rel_vel_valid , in_acceptance_range(), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y));
 			} else {
-				mavlink_log_info(&mavlink_log_pub, "NOT IN LANDING ZONE %d %d %d x %.2f y %.2f",_target_pose_initialised , _target_pose.rel_vel_valid , in_acceptance_range(), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y));
+				mavlink_log_info(&mavlink_log_pub, "Positioning %d %d %d x %.2f y %.2f",_target_pose_initialised , _target_pose.rel_vel_valid , in_acceptance_range(), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y));
 			}
 		}
 

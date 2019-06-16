@@ -172,6 +172,7 @@ private:
 
 	DEFINE_PARAMETERS(
 			(ParamFloat<px4::params::PLD_TLST_TOUT>) _param_target_lost_timeout,
+			(ParamFloat<px4::params::PLD_RLST_TOUT>) _param_target_really_lost_timeout,
 			(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
 			(ParamFloat<px4::params::PLD_HACC_RAD>) _param_hacc_rad,
 			(ParamFloat<px4::params::PLD_FAPPR_ALT>) _param_final_approach_alt,
