@@ -161,7 +161,7 @@ void LandingTargetEstimator::update()
 		return;
 	}
 
-	float dist = -_vehicleLocalPosition.z-3; //dist_to_bottom gives weird result in sim!?
+	float dist = -_vehicleLocalPosition.z; //dist_to_bottom gives weird result in sim!?
 	float alpha = sqrtf(powf(sensor_ray(0),2) + powf(sensor_ray(1),2));
 	float dist_to_marker = dist / cosf(alpha);
 
