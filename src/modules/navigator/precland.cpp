@@ -334,6 +334,8 @@ void PrecLand::update_approach() {
 
 		//gain scheduling based on height. 100% gains above 50m height, no lower than 20%
 		float f = -_navigator->get_local_position()->z; //_target_pose.z_rel;
+		if (f< 0)
+			f = 0;
 		f = powf(f,1.2f);
 		f/= 50;
 		if (f>1)
