@@ -352,7 +352,7 @@ void PrecLand::update_approach() {
 	if (vehicle_local_position->dist_bottom > 10 || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
 		pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
 		pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
-	} else {
+	} else { // this prevents oscilations
 		pos_sp_triplet->current.vx = vx_smthr.get_latest();
 		pos_sp_triplet->current.vy = vy_smthr.get_latest();
 	}
