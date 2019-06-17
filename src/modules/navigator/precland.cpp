@@ -84,10 +84,55 @@ PrecLand::on_activation()
 	pos_sp_triplet->next.valid = false;
 	if (!pos_sp_triplet->current.valid) {
 		mavlink_log_info(&mavlink_log_pub,"Resetting search position to current position");
+
+		pos_sp_triplet->next.lat = _navigator->get_global_position()->lat;
+		pos_sp_triplet->next.lon = _navigator->get_global_position()->lon;
+		pos_sp_triplet->next.alt = _navigator->get_global_position()->alt;
+		pos_sp_triplet->next.yaw = _navigator->get_global_position()->yaw;
+		pos_sp_triplet->next.yaw_valid = true;
+		pos_sp_triplet->next.yawspeed = 0;
+		pos_sp_triplet->next.yawspeed_valid = true;
+		pos_sp_triplet->next.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->next.position_valid = true;
+		pos_sp_triplet->next.vx = 0;
+		pos_sp_triplet->next.vy = 0;
+		pos_sp_triplet->next.vz = 0;
+		pos_sp_triplet->next.velocity_valid = false;
+		pos_sp_triplet->next.alt_valid = true;
+		pos_sp_triplet->next.valid = true;
+
+
 		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
 		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
 		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+		pos_sp_triplet->current.yaw = _navigator->get_global_position()->yaw;
+		pos_sp_triplet->current.yaw_valid = true;
+		pos_sp_triplet->current.yawspeed = 0;
+		pos_sp_triplet->current.yawspeed_valid = true;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.vx = 0;
+		pos_sp_triplet->current.vy = 0;
+		pos_sp_triplet->current.vz = 0;
+		pos_sp_triplet->current.velocity_valid = false;
+		pos_sp_triplet->current.alt_valid = true;
 		pos_sp_triplet->current.valid = true;
+
+		pos_sp_triplet->previous.lat = _navigator->get_global_position()->lat;
+		pos_sp_triplet->previous.lon = _navigator->get_global_position()->lon;
+		pos_sp_triplet->previous.alt = _navigator->get_global_position()->alt;
+		pos_sp_triplet->previous.yaw = _navigator->get_global_position()->yaw;
+		pos_sp_triplet->previous.yaw_valid = true;
+		pos_sp_triplet->previous.yawspeed = 0;
+		pos_sp_triplet->previous.yawspeed_valid = true;
+		pos_sp_triplet->previous.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->previous.position_valid = true;
+		pos_sp_triplet->previous.vx = 0;
+		pos_sp_triplet->previous.vy = 0;
+		pos_sp_triplet->previous.vz = 0;
+		pos_sp_triplet->previous.velocity_valid = false;
+		pos_sp_triplet->previous.alt_valid = true;
+		pos_sp_triplet->previous.valid = true;
 		_navigator->set_position_setpoint_triplet_updated();
 	} else {
 		mavlink_log_info(&mavlink_log_pub,"Error, current position not valid");
