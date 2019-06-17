@@ -99,8 +99,6 @@ PrecLand::on_activation()
 void
 PrecLand::on_active()
 {
-	debug_msg_div++; // tmp only for printing debug info
-
 	// get new target measurement
 	orb_check(_target_pose_sub, &_target_pose_updated);
 
@@ -164,7 +162,7 @@ PrecLand::on_active()
 			if (-vehicle_local_position->z < _param_search_alt.get() - 2)
 				land_speed_smthr.addSample(-2);
 			else
-				land_speed_smthr.addSample(0);
+				land_speed_smthr.addSample(0); //TODO: enable position control when on this height...
 
 
 			if (no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) {
@@ -196,6 +194,8 @@ PrecLand::on_active()
 	} default:
 		break;
 	}
+
+	debug_msg_div++; // only for printing debug info
 }
 
 void PrecLand::init_search_triplet() {
@@ -266,10 +266,11 @@ void PrecLand::update_land_speed() {
 
 		if (!(debug_msg_div % 12) ){
 			bool pos_control_enabled = no_v_diff_cnt <  _param_v_diff_cnt_tresh.get()+2;
+			float a = sqrtf(powf(fabs(_target_pose.angle_x),2)+powf(fabs(_target_pose.angle_y),2));
 			if (pos_control_enabled){
-				mavlink_log_info(&mavlink_log_pub, "Catching up %d %d %d x %.2f y %.2f",_target_pose_initialised , _target_pose.rel_vel_valid , in_acceptance_range(), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y));
+				mavlink_log_info(&mavlink_log_pub, "Catching up x %.2f y %.2f a %.2f lvz: %.2f ", static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y), (double)a, (double)land_speed_smthr.get_latest());
 			} else {
-				mavlink_log_info(&mavlink_log_pub, "Positioning %d %d %d x %.2f y %.2f",_target_pose_initialised , _target_pose.rel_vel_valid , in_acceptance_range(), static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y));
+				mavlink_log_info(&mavlink_log_pub, "Positioning x %.2f y %.2f lvz: %.2f ", static_cast<double>(_target_pose.angle_x), static_cast<double>(_target_pose.angle_y),(double)a, (double)land_speed_smthr.get_latest());
 			}
 		}
 
@@ -308,7 +309,7 @@ void PrecLand::update_approach() {
 	static float angle_x_prev = _target_pose.angle_x;
 	static float angle_y_prev = _target_pose.angle_y;
 
-	float dt = (_target_pose.timestamp - t_prev ) / 1e6f;
+	float dt = (_target_pose.timestamp - t_prev ) / SEC2USEC;
 
 	float d_angle_x = _target_pose.angle_x - angle_x_prev;
 	float d_angle_y = _target_pose.angle_y - angle_y_prev;
