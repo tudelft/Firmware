@@ -341,6 +341,7 @@ void PrecLand::update_approach() {
 
 	update_approach_land_speed();
 
+	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	double lat, lon;
@@ -348,8 +349,13 @@ void PrecLand::update_approach() {
 
 	pos_sp_triplet->current.lat = lat;
 	pos_sp_triplet->current.lon = lon;
-	pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
-	pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
+	if (vehicle_local_position->dist_bottom > 10 || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
+		pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
+		pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
+	} else {
+		pos_sp_triplet->current.vx = vx_smthr.get_latest();
+		pos_sp_triplet->current.vy = vy_smthr.get_latest();
+	}
 
 	float ss_p_gain = _param_pld_xy_g_p.get(); //pos p gain
 	float ss_i_gain = _param_pld_xy_g_i.get()/100.f; // pos i gai
