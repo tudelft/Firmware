@@ -222,6 +222,17 @@ PrecLand::on_active()
 			pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 			pos_sp_triplet->current.alt_valid = false;
 
+			if (vehicle_local_position->dist_bottom>_param_search_alt.get()-2) {
+				pos_sp_triplet->current.vz = 0;
+				pos_sp_triplet->current.alt_valid = true;
+				pos_sp_triplet->current.alt = vehicle_local_position->ref_alt + _param_search_alt.get();
+
+			} else {
+				pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
+				pos_sp_triplet->current.alt_valid = false;
+			}
+
+
 			pos_sp_triplet->current.velocity_valid = true;
 			pos_sp_triplet->current.position_valid = false;
 			pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
