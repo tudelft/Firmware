@@ -404,19 +404,17 @@ void PrecLand::update_approach() {
 		angle_x_i_err+=_target_pose.angle_x;
 		angle_y_i_err+=_target_pose.angle_y;
 
-		float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
-		float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
+		float ss_vx = ss_p_gain * _target_pose.angle_x - ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
+		float ss_vy = ss_p_gain * _target_pose.angle_y - ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
-		//gain scheduling based on height. 100% gains above 50m height, no lower than 20%
-		float f = vehicle_local_position->dist_bottom; //_target_pose.z_rel;
+		//the gains must be scaled by height.
+		float f = vehicle_local_position->dist_bottom;
 		if (f< 0)
 			f = 0;
-		f = powf(f,1.2f);
-		f/= 50;
-		if (f>1)
-			f = 1;
-		else if (f<0.2f)
-			f = 0.2f;
+		if (f>100)
+			f = 100;
+		f/= 100.f;
+
 		ss_vx*=f;
 		ss_vy*=f;
 

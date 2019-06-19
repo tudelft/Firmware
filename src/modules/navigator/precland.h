@@ -155,13 +155,13 @@ private:
 	bool _target_pose_updated{false}; /**< wether the landing target position message is updated */
 	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
-	Smoother_10 d_angle_x_smthr,d_angle_y_smthr;
+	Smoother_10 d_angle_x_smthr,d_angle_y_smthr,land_speed_smthr;
 
 	float angle_x_i_err = 0; //TODO: i controller may not be needed. Remove?
 	float angle_y_i_err = 0;
 	int no_v_diff_cnt;
 	float time_since_last_sighting = 999;
-	Smoother_100 land_speed_smthr, vx_smthr,vy_smthr;
+	Smoother_100 vx_smthr,vy_smthr;
 
 	int debug_msg_div = 0; // divider counter to limit debug messages
 	orb_advert_t mavlink_log_pub = nullptr;
