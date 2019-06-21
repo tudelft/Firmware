@@ -295,6 +295,13 @@ void PrecLand::update_approach_land_speed() {
 
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 //	std::cout << "t " << time_since_last_sighting;
+	float h = vehicle_local_position->dist_bottom;
+
+	if (h>5){
+		h = -vehicle_local_position->z;
+		if (h<5)
+			h=5;
+	}
 	if(in_acceptance_range() && time_since_last_sighting < 1.f ){
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
 
@@ -305,7 +312,8 @@ void PrecLand::update_approach_land_speed() {
 		//When it's a_max stop descending.
 
 		float max_land_speed = _param_pld_v_lnd.get();
-		float h = vehicle_local_position->dist_bottom;
+
+
 		if (h>15)
 			max_land_speed *= 2.f;
 		if (h<5)
@@ -326,16 +334,16 @@ void PrecLand::update_approach_land_speed() {
 
 		land_speed_smthr.addSample(land_speed);
 		if (!(debug_msg_div % 12))
-			mavlink_log_info(&mavlink_log_pub, "Descending  a %.2f lvz: %.2f d2b: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom );
+			mavlink_log_info(&mavlink_log_pub, "Descending  a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
 	} else {
 
 		if (!(debug_msg_div % 12) ){
 			bool pos_control_enabled = no_v_diff_cnt <  _param_v_diff_cnt_tresh.get()+2;
 			float a = sqrtf(powf(fabs(_target_pose.angle_x),2)+powf(fabs(_target_pose.angle_y),2));
 			if (pos_control_enabled){
-				mavlink_log_info(&mavlink_log_pub, "Catching up a %.2f lvz: %.2f d2b: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom );
+				mavlink_log_info(&mavlink_log_pub, "Catching up a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
 			} else {
-				mavlink_log_info(&mavlink_log_pub, "Positioning a %.2f lvz: %.2f d2b: %.2f", (double)a, (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom );
+				mavlink_log_info(&mavlink_log_pub, "Positioning a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom,(double)h );
 			}
 		}
 
@@ -397,6 +405,13 @@ void PrecLand::update_approach() {
 
 	int tresh = _param_v_diff_cnt_tresh.get();
 
+	float h = vehicle_local_position->dist_bottom;
+	if (h>5){
+		h = -vehicle_local_position->z;
+		if (h<5)
+			h=5;
+	}
+
 	if (dv<1 && no_v_diff_cnt < tresh+2 && _target_pose.abs_pos_valid && _target_pose_updated)
 		no_v_diff_cnt++;
 	if (no_v_diff_cnt > tresh){
@@ -407,16 +422,21 @@ void PrecLand::update_approach() {
 		float ss_vx = ss_p_gain * _target_pose.angle_x - ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
 		float ss_vy = ss_p_gain * _target_pose.angle_y - ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
-		//the gains must be scaled by height.
-		float f = vehicle_local_position->dist_bottom;
-		if (f< 0)
-			f = 0;
-		if (f>100)
-			f = 100;
-		f/= 100.f;
+//		//the gains must be scaled by height.
+//		float f = vehicle_local_position->dist_bottom;
+//		if (f< 0)
+//			f = 0;
+//		if (f>100)
+//			f = 100;
+//		f/= 100.f;
 
-		ss_vx*=f;
-		ss_vy*=f;
+//		ss_vx*=f;
+//		ss_vy*=f;
+
+
+
+		ss_vx*=h/20.f + 0.6f;
+		ss_vy*=h/20.f + 0.6f;
 
 		if (ss_vx>i_x_bound) {
 			ss_vx = i_x_bound;
@@ -442,17 +462,16 @@ void PrecLand::update_approach() {
 	pos_sp_triplet->current.alt_valid = false;
 
 	//land into the direction of the marker (adjust horizontal speed):
-	float h = vehicle_local_position->dist_bottom;
 	float vxr = _target_pose.x_rel / h;
 	float vyr = _target_pose.y_rel / h;
-	if (vxr > 1)
-		vxr = 1;
-	else if (vxr < -1)
-		vxr = -1;
-	if (vyr > 1)
-		vyr = 1;
-	else if (vyr < -1)
-		vyr = -1;
+	if (vxr > 3)
+		vxr = 3;
+	else if (vxr < -3)
+		vxr = -3;
+	if (vyr > 3)
+		vyr = 3;
+	else if (vyr < -3)
+		vyr = -3;
 	pos_sp_triplet->current.vx += vxr*land_speed_smthr.get_latest();
 	pos_sp_triplet->current.vy += vyr*land_speed_smthr.get_latest();
 
