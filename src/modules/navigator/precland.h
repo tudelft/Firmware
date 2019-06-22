@@ -45,6 +45,7 @@
 #include <px4_module_params.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/distance_sensor.h>
+#include <uORB/topics/vehicle_attitude.h> //TODO: remove?
 
 #include "navigator_mode.h"
 #include "mission_block.h"
@@ -144,15 +145,19 @@ public:
 
 private:
 	void init_search_triplet();
-	void update_approach_land_speed();
-	void update_approach();
+	void update_approach_land_speed(float h);
+	void update_approach(float h);
 	bool in_acceptance_range();
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
-
 	int _target_pose_sub{-1};
 	bool _target_pose_initialised{false}; /**< whether we have received a landing target position message */
 	bool _target_pose_updated{false}; /**< wether the landing target position message is updated */
+
+	vehicle_attitude_s _vehicleAttitude{};
+	int _attitudeSub{-1};
+	bool _v_att_updated{false}; /**< wether the landing target position message is updated */
+
 	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
 	Smoother_10 d_angle_x_smthr,d_angle_y_smthr,land_speed_smthr;
@@ -180,8 +185,7 @@ private:
 			(ParamFloat<px4::params::PLD_XY_G_P>) _param_pld_xy_g_p,
 			(ParamFloat<px4::params::PLD_XY_G_I>) _param_pld_xy_g_i,
 			(ParamFloat<px4::params::PLD_XY_G_D>) _param_pld_xy_g_d,
-			(ParamFloat<px4::params::PLD_X_BI>) _param_pld_x_bi,
-			(ParamFloat<px4::params::PLD_Y_BI>) _param_pld_y_bi,
+			(ParamFloat<px4::params::PLD_XY_SHP>) _param_pld_xy_shp,
 			(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
 			(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh
 			)

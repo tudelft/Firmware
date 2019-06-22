@@ -56,6 +56,7 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 
+
 //#include <iostream>
 
 #define SEC2USEC 1000000.0f
@@ -72,6 +73,9 @@ PrecLand::on_activation()
 	// We need to subscribe here and not in the constructor because constructor is called before the navigator task is spawned
 	if (_target_pose_sub < 0) {
 		_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
+	}
+	if (_attitudeSub < 0) {
+		_attitudeSub = orb_subscribe(ORB_ID(vehicle_attitude));
 	}
 
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
@@ -105,10 +109,10 @@ PrecLand::on_activation()
 		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
 		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
 		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
-//		pos_sp_triplet->current.yaw = _navigator->get_global_position()->yaw;
-//		pos_sp_triplet->current.yaw_valid = true;
-//		pos_sp_triplet->current.yawspeed = 0;
-//		pos_sp_triplet->current.yawspeed_valid = true;
+		//		pos_sp_triplet->current.yaw = _navigator->get_global_position()->yaw;
+		//		pos_sp_triplet->current.yaw_valid = true;
+		//		pos_sp_triplet->current.yawspeed = 0;
+		//		pos_sp_triplet->current.yawspeed_valid = true;
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 		pos_sp_triplet->current.position_valid = true;
 		pos_sp_triplet->current.vx = 0;
@@ -146,11 +150,13 @@ PrecLand::on_active()
 {
 	// get new target measurement
 	orb_check(_target_pose_sub, &_target_pose_updated);
-
 	if (_target_pose_updated) {
 		orb_copy(ORB_ID(landing_target_pose), _target_pose_sub, &_target_pose);
 		_target_pose_initialised = true;
 	}
+	orb_check(_attitudeSub, &_v_att_updated);
+	if (_v_att_updated)
+		orb_copy(ORB_ID(vehicle_attitude), _attitudeSub, &_vehicleAttitude);
 
 	if (_target_pose_initialised) {
 		if (_target_pose.rel_vel_valid){
@@ -167,6 +173,13 @@ PrecLand::on_active()
 
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
+
+	float h = vehicle_local_position->dist_bottom;
+	if (h>5){
+		h = -vehicle_local_position->z;
+		if (h<5)
+			h=5;
+	}
 
 	switch (_state) {
 	case PrecLandState::InitSearch: {
@@ -188,7 +201,7 @@ PrecLand::on_active()
 	} case PrecLandState::RunApproach: {
 		// check if target visible
 		if (time_since_last_sighting < _param_target_lost_timeout.get()) {
-			update_approach();
+			update_approach(h);
 			break;
 		} else
 			_state = PrecLandState::InitLost;
@@ -204,14 +217,16 @@ PrecLand::on_active()
 			_state = PrecLandState::InitApproach;
 		} else {
 			//immidiately increase the area we are looking at
-			if (vehicle_local_position->dist_bottom < _param_search_alt.get() - 2 && vehicle_local_position->dist_bottom >1 )
-				land_speed_smthr.addSample(-2);
-			else if (vehicle_local_position->dist_bottom >1)
+
+
+			if (h < _param_search_alt.get() - 2 && h >1 ) {
+				land_speed_smthr.addSample(-0.5);
+			} else if (h >1)
 				land_speed_smthr.addSample(0); //TODO: enable position control when on this height...
 			else
 				land_speed_smthr.addSample(_param_pld_v_lnd.get()/2.f); // final approach ignore lost just descend
 
-			if (no_v_diff_cnt < _param_v_diff_cnt_tresh.get() && vehicle_local_position->dist_bottom >15) {
+			if (no_v_diff_cnt < _param_v_diff_cnt_tresh.get() && h >15) {
 				//assume that we've lost the target because we weren't moving fast enough
 				pos_sp_triplet->current.vx = vx_smthr.get_latest()*2;
 				pos_sp_triplet->current.vy = vy_smthr.get_latest()*2;
@@ -222,7 +237,7 @@ PrecLand::on_active()
 			pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 			pos_sp_triplet->current.alt_valid = false;
 
-			if (vehicle_local_position->dist_bottom>_param_search_alt.get()-2) {
+			if (h>_param_search_alt.get()-2) {
 				pos_sp_triplet->current.vz = 0;
 				pos_sp_triplet->current.alt_valid = true;
 				pos_sp_triplet->current.alt = vehicle_local_position->ref_alt + _param_search_alt.get();
@@ -232,7 +247,6 @@ PrecLand::on_active()
 				pos_sp_triplet->current.alt_valid = false;
 			}
 
-
 			pos_sp_triplet->current.velocity_valid = true;
 			pos_sp_triplet->current.position_valid = false;
 			pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET;
@@ -240,9 +254,8 @@ PrecLand::on_active()
 
 			_navigator->set_position_setpoint_triplet_updated();
 
-
 			if (!(debug_msg_div % 12) ){
-				mavlink_log_info(&mavlink_log_pub, "Lost lvz: %.2f d2b: %.2f", (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom);
+				mavlink_log_info(&mavlink_log_pub, "Lost lvz: %.2f d2b: %.2f h: %.2f", (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom, (double) h);
 			}
 
 		}
@@ -291,22 +304,11 @@ void PrecLand::init_search_triplet() {
 	_navigator->set_position_setpoint_triplet_updated();
 }
 
-void PrecLand::update_approach_land_speed() {
+void PrecLand::update_approach_land_speed(float h) {
 
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-//	std::cout << "t " << time_since_last_sighting;
-	float h = vehicle_local_position->dist_bottom;
-
-	if (h>5){
-		h = -vehicle_local_position->z;
-		if (h<5)
-			h=5;
-	}
 	if(in_acceptance_range() && time_since_last_sighting < 1.f ){
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
-
-//		std::cout << " a: " << a;
-
 		float a_max = 0.4f; //this is camera (fov) dependent
 		//is in the range of approx [0 - a_max], when it is 0 we want to descend as fast a possible.
 		//When it's a_max stop descending.
@@ -349,18 +351,16 @@ void PrecLand::update_approach_land_speed() {
 
 		land_speed_smthr.addSample(0.f);
 	}
-//	std::cout << std::endl;
 }
 
-void PrecLand::update_approach() {
+void PrecLand::update_approach(float h) {
 
 	static uint64_t t_prev = 0;
 	if (t_prev == _target_pose.timestamp)
 		return;
 
-	update_approach_land_speed();
+	update_approach_land_speed(h);
 
-	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	double lat, lon;
@@ -368,9 +368,12 @@ void PrecLand::update_approach() {
 
 	pos_sp_triplet->current.lat = lat;
 	pos_sp_triplet->current.lon = lon;
-	if (vehicle_local_position->dist_bottom > 10 || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
+	if (h > 10 || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
 		pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
 		pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
+		// reset integrator error when marker v estimation is active
+		angle_x_i_err = 0;
+		angle_y_i_err = 0;
 	} else { // this prevents oscilations
 		pos_sp_triplet->current.vx = vx_smthr.get_latest();
 		pos_sp_triplet->current.vy = vy_smthr.get_latest();
@@ -379,8 +382,6 @@ void PrecLand::update_approach() {
 	float ss_p_gain = _param_pld_xy_g_p.get(); //pos p gain
 	float ss_i_gain = _param_pld_xy_g_i.get()/100.f; // pos i gai
 	float ss_d_gain = _param_pld_xy_g_d.get(); //pos p gain
-	float i_x_bound = _param_pld_x_bi.get(); //bound pos y control m/s
-	float i_y_bound = _param_pld_y_bi.get(); //bound pos y control m/s
 
 	//only activate pos control when drone is up to speed
 	float dv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vy_rel,2));
@@ -390,74 +391,46 @@ void PrecLand::update_approach() {
 
 	float dt = (_target_pose.timestamp - t_prev ) / SEC2USEC;
 
-	float d_angle_x = _target_pose.angle_x - angle_x_prev;
-	float d_angle_y = _target_pose.angle_y - angle_y_prev;
-
+	float d_angle_x = angle_x_prev - _target_pose.angle_x;
+	float d_angle_y = angle_y_prev - _target_pose.angle_y;
 	float d_angle_x_smoothed = 0;
 	float d_angle_y_smoothed = 0;
 	if (t_prev>0){
 		d_angle_x_smoothed = d_angle_x_smthr.addSample(d_angle_x/dt);
 		d_angle_y_smoothed = d_angle_y_smthr.addSample(d_angle_y/dt);
 	}
+
+
+//	float d_angle_no_att_x = (angle_x_prev - _target_pose.angle_x)/dt - _vehicleAttitude.rollspeed;
+//	float d_angle_no_att_y = (angle_x_prev - _target_pose.angle_x)/dt - _vehicleAttitude.pitchspeed;
+
 	angle_x_prev = _target_pose.angle_x;
 	angle_y_prev = _target_pose.angle_y;
+
+
 	t_prev = _target_pose.timestamp;
 
 	int tresh = _param_v_diff_cnt_tresh.get();
 
-	float h = vehicle_local_position->dist_bottom;
-	if (h>5){
-		h = -vehicle_local_position->z;
-		if (h<5)
-			h=5;
-	}
-
 	if (dv<1 && no_v_diff_cnt < tresh+2 && _target_pose.abs_pos_valid && _target_pose_updated)
 		no_v_diff_cnt++;
 	if (no_v_diff_cnt > tresh){
-//		std::cout << "pos control, vz:" << land_speed_smthr.get_latest() << std::endl;
 		angle_x_i_err+=_target_pose.angle_x;
 		angle_y_i_err+=_target_pose.angle_y;
 
-		float ss_vx = ss_p_gain * _target_pose.angle_x - ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
-		float ss_vy = ss_p_gain * _target_pose.angle_y - ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
-//		//the gains must be scaled by height.
-//		float f = vehicle_local_position->dist_bottom;
-//		if (f< 0)
-//			f = 0;
-//		if (f>100)
-//			f = 100;
-//		f/= 100.f;
+		//scale p gain to height:
+		float f = 1+h/_param_pld_xy_shp.get();
 
-//		ss_vx*=f;
-//		ss_vy*=f;
+		ss_p_gain *=f;
 
-
-
-		ss_vx*=h/20.f + 0.6f;
-		ss_vy*=h/20.f + 0.6f;
-
-		if (ss_vx>i_x_bound) {
-			ss_vx = i_x_bound;
-			//				angle_x_i_err = i_x_bound / ss_i_gain;
-		} else if (ss_vx<-i_x_bound){
-			ss_vx = -i_x_bound;
-			//				angle_x_i_err = -i_x_bound / ss_i_gain;
-		}
-		if (ss_vy>i_y_bound){
-			ss_vy = i_y_bound;
-			//				angle_y_i_err = i_y_bound / ss_i_gain;
-		} else if (ss_vy<-i_y_bound) {
-			ss_vy = -i_y_bound;
-			//				angle_y_i_err = -i_y_bound / ss_i_gain;
-		}
+		float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
+		float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
 		pos_sp_triplet->current.vx +=ss_vx;
 		pos_sp_triplet->current.vy +=ss_vy;
 	}
 
-//	pos_sp_triplet->current.alt = _navigator->get_global_position()->alt - land_speed_smthr.get_latest() ;
 	pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 	pos_sp_triplet->current.alt_valid = false;
 

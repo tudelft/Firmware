@@ -128,7 +128,9 @@ void LandingTargetEstimator::update()
 	// mark this sensor measurement as consumed
 	_new_irlockReport = false;
 
-	if (!_vehicleAttitude_valid || !_vehicleLocalPosition_valid || !_vehicleLocalPosition.dist_bottom_valid) {
+//	std::cout << "Bla 2: " << _vehicleAttitude_valid << " " << _vehicleLocalPosition_valid << " " << _vehicleLocalPosition.dist_bottom_valid <<std::endl;
+
+	if (!_vehicleAttitude_valid || !_vehicleLocalPosition_valid) {
 		// don't have the data needed for an update
 		return;
 	}
@@ -161,7 +163,12 @@ void LandingTargetEstimator::update()
 		return;
 	}
 
-	float dist = -_vehicleLocalPosition.z; //dist_to_bottom gives weird result in sim!?
+	float dist = _vehicleLocalPosition.dist_bottom;
+	if (dist>5){
+		dist = -_vehicleLocalPosition.z;
+		if (dist<5)
+			dist=5;
+	}
 	float alpha = sqrtf(powf(sensor_ray(0),2) + powf(sensor_ray(1),2));
 	float dist_to_marker = dist / cosf(alpha);
 

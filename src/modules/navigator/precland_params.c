@@ -160,28 +160,16 @@ PARAM_DEFINE_FLOAT(PLD_XY_G_I, 0.00f);
 PARAM_DEFINE_FLOAT(PLD_XY_G_D, 0.8f);
 
 /**
- * Bound speed for position control in x direction
+ * Position P gain
  *
- * @unit m/s
- * @min 0.0
- * @max 5
+ * @min 1.0
+ * @max 500
  * @decimal 1
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_X_BI, 1.5f);
+PARAM_DEFINE_FLOAT(PLD_XY_SHP, 60.0f);
 
-/**
- * Bound speed for position control in y direction
- *
- * @unit m/s
- * @min 0.0
- * @max 5
- * @decimal 1
- * @increment 0.05
- * @group Precision Land
- */
-PARAM_DEFINE_FLOAT(PLD_Y_BI, 2.5f);
 
 /**
  * Land speed. Above 15m this number is doubled. Below 4 meters this number is halved.
