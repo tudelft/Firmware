@@ -92,10 +92,10 @@ PrecLand::on_activation()
 		pos_sp_triplet->next.lat = _navigator->get_global_position()->lat;
 		pos_sp_triplet->next.lon = _navigator->get_global_position()->lon;
 		pos_sp_triplet->next.alt = _navigator->get_global_position()->alt;
-//		pos_sp_triplet->next.yaw = _navigator->get_global_position()->yaw;
-//		pos_sp_triplet->next.yaw_valid = true;
-//		pos_sp_triplet->next.yawspeed = 0;
-//		pos_sp_triplet->next.yawspeed_valid = true;
+		pos_sp_triplet->next.yaw = _navigator->get_global_position()->yaw;
+		pos_sp_triplet->next.yaw_valid = true;
+		pos_sp_triplet->next.yawspeed = 0;
+		pos_sp_triplet->next.yawspeed_valid = true;
 		pos_sp_triplet->next.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 		pos_sp_triplet->next.position_valid = true;
 		pos_sp_triplet->next.vx = 0;
@@ -109,10 +109,10 @@ PrecLand::on_activation()
 		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
 		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
 		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
-		//		pos_sp_triplet->current.yaw = _navigator->get_global_position()->yaw;
-		//		pos_sp_triplet->current.yaw_valid = true;
-		//		pos_sp_triplet->current.yawspeed = 0;
-		//		pos_sp_triplet->current.yawspeed_valid = true;
+		pos_sp_triplet->current.yaw = _navigator->get_global_position()->yaw;
+		pos_sp_triplet->current.yaw_valid = true;
+		pos_sp_triplet->current.yawspeed = 0;
+		pos_sp_triplet->current.yawspeed_valid = true;
 		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 		pos_sp_triplet->current.position_valid = true;
 		pos_sp_triplet->current.vx = 0;
@@ -125,10 +125,10 @@ PrecLand::on_activation()
 		pos_sp_triplet->previous.lat = _navigator->get_global_position()->lat;
 		pos_sp_triplet->previous.lon = _navigator->get_global_position()->lon;
 		pos_sp_triplet->previous.alt = _navigator->get_global_position()->alt;
-//		pos_sp_triplet->previous.yaw = _navigator->get_global_position()->yaw;
-//		pos_sp_triplet->previous.yaw_valid = true;
-//		pos_sp_triplet->previous.yawspeed = 0;
-//		pos_sp_triplet->previous.yawspeed_valid = true;
+		pos_sp_triplet->previous.yaw = _navigator->get_global_position()->yaw;
+		pos_sp_triplet->previous.yaw_valid = true;
+		pos_sp_triplet->previous.yawspeed = 0;
+		pos_sp_triplet->previous.yawspeed_valid = true;
 		pos_sp_triplet->previous.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 		pos_sp_triplet->previous.position_valid = true;
 		pos_sp_triplet->previous.vx = 0;
@@ -377,8 +377,6 @@ void PrecLand::update_approach(float h) {
 	if (h > 10 || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
 		pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
 		pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
-
-
 	} else { // this prevents oscilations
 		pos_sp_triplet->current.vx = vx_smthr.get_latest();
 		pos_sp_triplet->current.vy = vy_smthr.get_latest();
@@ -404,7 +402,6 @@ void PrecLand::update_approach(float h) {
 		d_angle_x_smoothed = d_angle_x_smthr.addSample(d_angle_x/dt);
 		d_angle_y_smoothed = d_angle_y_smthr.addSample(d_angle_y/dt);
 	}
-
 
 //	float d_angle_no_att_x = (angle_x_prev - _target_pose.angle_x)/dt - _vehicleAttitude.rollspeed;
 //	float d_angle_no_att_y = (angle_x_prev - _target_pose.angle_x)/dt - _vehicleAttitude.pitchspeed;
@@ -432,8 +429,11 @@ void PrecLand::update_approach(float h) {
 		float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
 		float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;
 
-		pos_sp_triplet->current.vx +=ss_vx;
-		pos_sp_triplet->current.vy +=ss_vy;
+		//rotate and add
+		matrix::Eulerf euler = matrix::Quatf(_vehicleAttitude.q);
+		pos_sp_triplet->current.vx += cosf(euler.psi()) * ss_vx - sinf(euler.psi()) * ss_vy;
+		pos_sp_triplet->current.vy += sinf(euler.psi()) * ss_vx + cosf(euler.psi()) * ss_vy;
+
 	}
 
 	if (!_param_only_flw.get()){
