@@ -1445,6 +1445,8 @@ MulticopterPositionControl::control_non_manual()
 		if (!_pos_sp_triplet.current.alt_valid) { //landing
 			_vel_sp(2) = _pos_sp_triplet.current.vz;
 			_run_alt_control = false;
+		} else {
+			_run_alt_control = true;
 		}
 
 			// track target using velocity only
@@ -1456,6 +1458,8 @@ MulticopterPositionControl::control_non_manual()
 		if (!_pos_sp_triplet.current.alt_valid) { //landing
 			_vel_sp(2) =  _pos_sp_triplet.current.vz;
 			_run_alt_control = false;
+		} else {
+			_run_alt_control = true;
 		}
 
 	} else {
