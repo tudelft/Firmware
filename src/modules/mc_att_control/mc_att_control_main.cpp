@@ -289,6 +289,16 @@ MulticopterAttitudeControl::vehicle_status_poll()
 	}
 }
 
+void MulticopterAttitudeControl::actuator_controls_2_poll()
+{
+	bool updated;
+	orb_check(_actuators_2_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(actuator_controls_2), _actuators_2_sub, &_actuators_2);
+	}
+}
+
 void
 MulticopterAttitudeControl::vehicle_motor_limits_poll()
 {
@@ -475,6 +485,24 @@ MulticopterAttitudeControl::pid_attenuations(float tpa_breakpoint, float tpa_rat
 	return pidAttenuationPerAxis;
 }
 
+bool MulticopterAttitudeControl::busy_sampling()
+{
+	// value between -1 and +1
+	float servo_command = _actuators_2.control[0];
+
+	// rescale to initial input value
+	// basically inverse of what happens in MissionBlock::issue_command
+	float servo_rescaled = -servo_command * 2000;
+
+	int servo_int = (int)(servo_rescaled + math::sign(servo_rescaled) * 0.5f);
+
+	if (servo_int == -2000) {
+		return true;
+	}
+
+	return false;
+}
+
 /*
  * Attitude rates controller.
  * Input: '_rates_sp' vector, '_thrust_sp'
@@ -623,6 +651,8 @@ MulticopterAttitudeControl::run()
 
 	_sensor_bias_sub = orb_subscribe(ORB_ID(sensor_bias));
 
+	_actuators_2_sub = orb_subscribe(ORB_ID(actuator_controls_2));
+
 	/* wakeup source: gyro data from sensor selected by the sensor app */
 	px4_pollfd_struct_t poll_fds = {};
 	poll_fds.events = POLLIN;
@@ -681,6 +711,7 @@ MulticopterAttitudeControl::run()
 			vehicle_attitude_poll();
 			sensor_correction_poll();
 			sensor_bias_poll();
+			actuator_controls_2_poll();
 
 			/* Check if we are in rattitude mode and the pilot is above the threshold on pitch
 			 * or roll (yaw can rotate 360 in normal att control).  If both are true don't
@@ -763,6 +794,14 @@ MulticopterAttitudeControl::run()
 						_actuators.control[i] *= _battery_status.scale;
 					}
 				}
+
+				/* water-sampling -> disable motors */
+				if (busy_sampling()) {
+					_actuators.control[3] = 0.0f;
+					// and reset integrator
+					_rates_int.zero();
+				}
+
 
 				if (!_actuators_0_circuit_breaker_enabled) {
 					if (_actuators_0_pub != nullptr) {

@@ -107,6 +107,7 @@ private:
 	void		vehicle_motor_limits_poll();
 	void		vehicle_rates_setpoint_poll();
 	void		vehicle_status_poll();
+	void		actuator_controls_2_poll();
 
 	/**
 	 * Attitude controller.
@@ -123,6 +124,11 @@ private:
 	 */
 	matrix::Vector3f pid_attenuations(float tpa_breakpoint, float tpa_rate);
 
+	/**
+	 * Checks the servo position to determine if sample is being taken.
+	 */
+	bool		busy_sampling();
+
 
 	int		_v_att_sub{-1};			/**< vehicle attitude subscription */
 	int		_v_att_sp_sub{-1};		/**< vehicle attitude setpoint subscription */
@@ -136,6 +142,7 @@ private:
 	int		_sensor_gyro_sub[MAX_GYRO_COUNT];	/**< gyro data subscription */
 	int		_sensor_correction_sub{-1};	/**< sensor thermal correction subscription */
 	int		_sensor_bias_sub{-1};		/**< sensor in-run bias correction subscription */
+	int		_actuators_2_sub{-1};		/**< to check water-sample servo position */
 
 	unsigned _gyro_count{1};
 	int _selected_gyro{0};
@@ -160,6 +167,7 @@ private:
 	struct sensor_gyro_s			_sensor_gyro {};	/**< gyro data before thermal correctons and ekf bias estimates are applied */
 	struct sensor_correction_s		_sensor_correction {};	/**< sensor thermal corrections */
 	struct sensor_bias_s			_sensor_bias {};	/**< sensor in-run bias corrections */
+	struct actuator_controls_s		_actuators_2 {};	/**< to check water-sample servo position */
 
 	MultirotorMixer::saturation_status _saturation_status{};
 
