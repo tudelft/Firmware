@@ -69,6 +69,8 @@
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 
+#include "mc_att_control/mc_att_control.hpp"
+
 #include <float.h>
 #include <lib/ecl/geo/geo.h>
 #include <mathlib/mathlib.h>
@@ -134,6 +136,7 @@ private:
 	bool 		_hold_offboard_xy = false; 			/**<TODO : check if we need this extra hold_offboard flag */
 	bool 		_hold_offboard_z = false;
 	bool 		_in_smooth_takeoff = false; 				/**<true if takeoff ramp is applied */
+	bool 		_in_smooth_takeoff_prev = false; 				/**<true if takeoff ramp is applied */
 	bool 		_in_landing = false;				/**<true if landing descent (only used in auto) */
 	bool 		_lnd_reached_ground = false; 		/**<true if controller assumes the vehicle has reached the ground after landing */
 	bool 		_triplet_lat_lon_finite = true; 		/**<true if triplets current is non-finite */
@@ -3299,14 +3302,32 @@ MulticopterPositionControl::task_main()
 	_control_task = -1;
 }
 
+hrt_abstime failed_water_takeoff = 0;
 void
 MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
-	_in_smooth_takeoff = _takeoff_vel_limit < -vel_sp_z;
-	/* ramp vertical velocity limit up to takeoff speed */
-	_takeoff_vel_limit += -vel_sp_z * _dt / _takeoff_ramp_time.get();
-	/* limit vertical velocity to the current ramp value */
-	vel_sp_z = math::max(vel_sp_z, -_takeoff_vel_limit);
+
+	//at the end of the take off ramp, detect if the drone has a small attitude.
+	if (fabs(_att.rollspeed) + fabs(_att.pitchspeed)   < 666  ||  hrt_elapsed_time(&failed_water_takeoff)>0 ) {
+//		_pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_IDLE;
+		set_idle_state();
+		_takeoff_vel_limit = -0.5f;
+
+		if (hrt_elapsed_time( &failed_water_takeoff)!=0)
+			failed_water_takeoff = hrt_absolute_time();
+	}
+
+	if (hrt_elapsed_time( &failed_water_takeoff)> 5e6){
+		failed_water_takeoff = 0;
+	}
+
+	if (!failed_water_takeoff) {
+		_in_smooth_takeoff = _takeoff_vel_limit < -vel_sp_z;
+		/* ramp vertical velocity limit up to takeoff speed */
+		_takeoff_vel_limit += -vel_sp_z * _dt / _takeoff_ramp_time.get();
+		/* limit vertical velocity to the current ramp value */
+		vel_sp_z = math::max(vel_sp_z, -_takeoff_vel_limit);
+	}
 }
 
 void
