@@ -182,3 +182,15 @@ PARAM_DEFINE_FLOAT(PLD_XY_SHP, 60.0f);
  * @group Precision Land
  */
 PARAM_DEFINE_FLOAT(PLD_V_LND, 1.5f);
+
+/**
+ * v up speed after lost. If the marker was found, but lost after time out. The drone goes up with max this speed.
+ *
+ * @unit m/s
+ * @min -5.0
+ * @max -0.0
+ * @decimal 1
+ * @increment 0.05
+ * @group Precision Land
+ */
+PARAM_DEFINE_FLOAT(PLD_V_U_LST, -0.5f);

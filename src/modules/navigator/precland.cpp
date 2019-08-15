@@ -175,7 +175,7 @@ PrecLand::on_active()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	float h = vehicle_local_position->dist_bottom;
-	if (h>5){
+	if (h>5 && !_param_marker_distance_type.get()){
 		h = -vehicle_local_position->z;
 		if (h<5)
 			h=5;
@@ -224,7 +224,7 @@ PrecLand::on_active()
 
 
 			if (h < _param_search_alt.get() - 2 && h >_param_final_approach_alt.get() ) {
-				land_speed_smthr.addSample(-0.5);
+				land_speed_smthr.addSample(_param_pld_v_up_lst.get());
 			} else if (h >_param_final_approach_alt.get())
 				land_speed_smthr.addSample(0);
 			else
