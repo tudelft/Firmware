@@ -3329,8 +3329,10 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 	}
 
 	if (!failed_water_takeoff) {
-		if (_in_smooth_takeoff && !_takeoff_vel_limit < -vel_sp_z)
+		if (_in_smooth_takeoff && !(_takeoff_vel_limit < -vel_sp_z)){
 			PX4_INFO("TAKE OFF DONE");
+			mavlink_log_critical(&_mavlink_log_pub, "TAKE OFF DONE");
+		}
 		_in_smooth_takeoff = _takeoff_vel_limit < -vel_sp_z;
 		/* ramp vertical velocity limit up to takeoff speed */
 		_takeoff_vel_limit += -vel_sp_z * _dt / _takeoff_ramp_time.get();
