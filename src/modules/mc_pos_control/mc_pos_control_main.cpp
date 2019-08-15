@@ -3308,7 +3308,7 @@ hrt_abstime failed_water_takeoff = 0;
 void
 MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
-	//at the end of the take off ramp, detect if the drone has a small attitude.
+	//during take off, detect if the drone has a large attitude. Then temporarily kill the motors.
 	matrix::Eulerf eul = matrix::Quatf(_att.q);
 	if (fabs(eul.psi()) + fabs(eul.theta()) > M_PI_F/3.f) {
 		if (failed_water_takeoff == 0) {
@@ -3329,6 +3329,8 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 	}
 
 	if (!failed_water_takeoff) {
+		if (_in_smooth_takeoff && !_takeoff_vel_limit < -vel_sp_z)
+			PX4_INFO("TAKE OFF DONE");
 		_in_smooth_takeoff = _takeoff_vel_limit < -vel_sp_z;
 		/* ramp vertical velocity limit up to takeoff speed */
 		_takeoff_vel_limit += -vel_sp_z * _dt / _takeoff_ramp_time.get();
