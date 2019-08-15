@@ -415,6 +415,8 @@ private:
 
 	void publish_local_pos_sp();
 
+	void send_lockdown_command(bool lockdown);
+
 	/**
 	 * Shim for calling task_main from task_create.
 	 */
@@ -3308,9 +3310,11 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
 	//at the end of the take off ramp, detect if the drone has a small attitude.
 	matrix::Eulerf eul = matrix::Quatf(_att.q);
-	if (fabs(eul.psi()) + fabs(eul.theta()) < M_PI_F/3.f) {
+	if (fabs(eul.psi()) + fabs(eul.theta()) > M_PI_F/3.f) {
 		if (failed_water_takeoff == 0) {
 			//disarm/kill/terminate/whatever
+			PX4_INFO("LOCKDOWN TRUE");
+			send_lockdown_command(true);
 		}
 		failed_water_takeoff = hrt_absolute_time();
 	}
@@ -3324,6 +3328,8 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 		_pos_sp_triplet.current.valid = true;
 		if (failed_water_takeoff != 0) {
 			//arm/unkill/whatever
+			PX4_INFO("LOCKDOWN FALSE");
+			send_lockdown_command(false);
 		}
 		failed_water_takeoff = 0;
 	}
@@ -3381,6 +3387,33 @@ MulticopterPositionControl::publish_local_pos_sp()
 					    ORB_ID(vehicle_local_position_setpoint),
 					    &_local_pos_sp);
 	}
+}
+
+void MulticopterPositionControl::send_lockdown_command(bool lockdown)
+{
+
+	if (lockdown) {
+		mavlink_log_critical(&_mavlink_log_pub, "LOCKDOWN");
+	} else {
+		mavlink_log_critical(&_mavlink_log_pub, "CONTINNUUU");
+	}
+	struct vehicle_command_s cmd = {
+		.timestamp = 0,
+		.param5 = 0.0f,
+		.param6 = 0.0f,
+		/* if the comparison matches for off (== 0) set 0.0f, 2.0f (on) else */
+		.param1 = lockdown ? 2.0f : 0.0f, /* lockdown */
+		.param2 = 0.0f,
+		.param3 = 0.0f,
+		.param4 = 0.0f,
+		.param7 = 0.0f,
+		.command = vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION,
+		.target_system = _vehicle_status.system_id,
+		.target_component = _vehicle_status.component_id
+	};
+
+	orb_advert_t h = orb_advertise_queue(ORB_ID(vehicle_command), &cmd, vehicle_command_s::ORB_QUEUE_LENGTH);
+	(void)orb_unadvertise(h);
 }
 
 void
