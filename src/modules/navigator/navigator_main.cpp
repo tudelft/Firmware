@@ -66,6 +66,7 @@
 #include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/transponder_report.h>
+#include <uORB/topics/actuator_controls.h>
 #include <uORB/uORB.h>
 
 /**
@@ -463,6 +464,24 @@ Navigator::run()
 
 				// TODO: handle responses for supported DO_CHANGE_SPEED options?
 				publish_vehicle_command_ack(cmd, vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED);
+
+			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_SET_SERVO) {
+				// copied from MissionBlock
+
+				// XXX: we should issue a vehicle command and handle this somewhere else
+				actuator_controls_s actuators = {};
+				actuators.timestamp = hrt_absolute_time();
+
+				// params[0] actuator number to be set 0..5 (corresponds to AUX outputs 1..6)
+				// params[1] new value for selected actuator in ms 900...2000
+				actuators.control[(int)cmd.param1] = 1.0f / 2000 * -cmd.param2;
+
+				if (_actuator_pub != nullptr) {
+					orb_publish(ORB_ID(actuator_controls_2), _actuator_pub, &actuators);
+
+				} else {
+					_actuator_pub = orb_advertise(ORB_ID(actuator_controls_2), &actuators);
+				}
 
 			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_SET_ROI
 				   || cmd.command == vehicle_command_s::VEHICLE_CMD_NAV_ROI

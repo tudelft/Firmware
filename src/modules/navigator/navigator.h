@@ -290,6 +290,7 @@ private:
 	orb_advert_t	_vehicle_cmd_ack_pub{nullptr};
 	orb_advert_t	_vehicle_cmd_pub{nullptr};
 	orb_advert_t	_vehicle_roi_pub{nullptr};
+	orb_advert_t	_actuator_pub{nullptr};
 
 	// Subscriptions
 	fw_pos_ctrl_status_s				_fw_pos_ctrl_status{};	/**< fixed wing navigation capabilities */
