@@ -3306,19 +3306,20 @@ hrt_abstime failed_water_takeoff = 0;
 void
 MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
-
 	//at the end of the take off ramp, detect if the drone has a small attitude.
-	if (fabs(_att.rollspeed) + fabs(_att.pitchspeed) < 666) {
+	if (fabs(_att.rollspeed) + fabs(_att.pitchspeed) > 666) {
 		failed_water_takeoff = hrt_absolute_time();
 	}
 
 	if (hrt_elapsed_time(&failed_water_takeoff) < 5e6) {
-		PX4_INFO("%1.2f %1.2f", (double)_att.rollspeed, (double)_att.pitchspeed);
+//		PX4_INFO("%1.2f %1.2f", (double)_att.rollspeed, (double)_att.pitchspeed);
 //		_pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_IDLE;
 		_att_sp.thrust = 0.0f;
 		_pos_sp_triplet.current.valid = false;
 		_takeoff_vel_limit = -0.5f;
 
+	} else {
+		_pos_sp_triplet.current.valid = true;
 	}
 
 	if (!failed_water_takeoff) {
