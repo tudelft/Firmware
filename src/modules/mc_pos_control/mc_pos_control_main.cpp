@@ -3319,13 +3319,7 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 		failed_water_takeoff = hrt_absolute_time();
 	}
 
-	if (hrt_elapsed_time(&failed_water_takeoff) < 5e6) {
-		_att_sp.thrust = 0.0f;
-		_pos_sp_triplet.current.valid = false;
-		_takeoff_vel_limit = -0.5f;
-
-	} else {
-		_pos_sp_triplet.current.valid = true;
+	if (hrt_elapsed_time(&failed_water_takeoff) > 3e6) {
 		if (failed_water_takeoff != 0) {
 			//arm/unkill/whatever
 			PX4_INFO("LOCKDOWN FALSE");
@@ -3396,7 +3390,13 @@ void MulticopterPositionControl::send_lockdown_command(bool lockdown)
 		mavlink_log_critical(&_mavlink_log_pub, "LOCKDOWN");
 	} else {
 		mavlink_log_critical(&_mavlink_log_pub, "CONTINNUUU");
+
+		// reset integrators
+		_reset_int_xy = true;
+		_reset_int_z = true;
+		_takeoff_vel_limit = -0.5f;
 	}
+
 	struct vehicle_command_s cmd = {
 		.timestamp = 0,
 		.param5 = 0.0f,
