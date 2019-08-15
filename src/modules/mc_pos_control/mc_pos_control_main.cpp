@@ -3307,7 +3307,8 @@ void
 MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
 	//at the end of the take off ramp, detect if the drone has a small attitude.
-	if (fabs(_att.rollspeed) + fabs(_att.pitchspeed) > 666) {
+	matrix::Eulerf eul = matrix::Quatf(_att.q);
+	if (fabs(eul.psi()) + fabs(eul.theta()) > M_PIf32/3.f) {
 		failed_water_takeoff = hrt_absolute_time();
 	}
 

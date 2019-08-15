@@ -15,7 +15,7 @@ param set CAL_GYRO0_ID 2293768
 param set CAL_GYRO0_XOFF 0.01
 param set CAL_MAG0_ID 196616
 param set CAL_MAG0_XOFF 0.01
-param set COM_DISARM_LAND 3
+//param set COM_DISARM_LAND 3
 param set COM_OBL_ACT 2
 param set COM_OBL_RC_ACT 0
 param set COM_OF_LOSS_T 5
