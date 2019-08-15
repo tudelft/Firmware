@@ -233,7 +233,9 @@ private:
 		(ParamInt<px4::params::MPC_ALT_MODE>) _alt_mode,
 		(ParamFloat<px4::params::RC_FLT_CUTOFF>) _rc_flt_cutoff,
 		(ParamFloat<px4::params::RC_FLT_SMP_RATE>) _rc_flt_smp_rate,
-		(ParamFloat<px4::params::MPC_ACC_HOR_ESTM>) _acc_max_estimator_xy
+		(ParamFloat<px4::params::MPC_ACC_HOR_ESTM>) _acc_max_estimator_xy,
+		(ParamFloat<px4::params::PEL_WT_ATT_MAX>) _pelican_water_takeoff_max_att,
+		(ParamFloat<px4::params::PEL_WT_RETRY_T>) _pelican_water_takeoff_retry_time
 
 	);
 
@@ -3092,6 +3094,7 @@ MulticopterPositionControl::task_main()
 		if (!_in_smooth_takeoff && _vehicle_land_detected.landed && _control_mode.flag_armed &&
 		    (in_auto_takeoff() || manual_wants_takeoff())) {
 			_in_smooth_takeoff = true;
+			mavlink_log_critical(&_mavlink_log_pub, "SMOOTH");
 			// This ramp starts negative and goes to positive later because we want to
 			// be as smooth as possible. If we start at 0, we alrady jump to hover throttle.
 			_takeoff_vel_limit = -0.5f;
@@ -3310,7 +3313,11 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
 	//during take off, detect if the drone has a large attitude. Then temporarily kill the motors.
 	matrix::Eulerf eul = matrix::Quatf(_att.q);
-	if (fabs(eul.psi()) + fabs(eul.theta()) > M_PI_F/3.f) {
+	float max_att = fabs(eul.psi());
+	if (fabs(eul.theta()) > max_att)
+			max_att = fabs(eul.theta());
+
+	if (max_att / M_PI_F * 180.f > _pelican_water_takeoff_max_att.get()) {
 		if (failed_water_takeoff == 0) {
 			//disarm/kill/terminate/whatever
 			PX4_INFO("LOCKDOWN TRUE");
@@ -3319,7 +3326,7 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 		failed_water_takeoff = hrt_absolute_time();
 	}
 
-	if (hrt_elapsed_time(&failed_water_takeoff) > 3e6) {
+	if (hrt_elapsed_time(&failed_water_takeoff) > _pelican_water_takeoff_retry_time.get() * 1e6f) {
 		if (failed_water_takeoff != 0) {
 			//arm/unkill/whatever
 			PX4_INFO("LOCKDOWN FALSE");
