@@ -3313,7 +3313,7 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 {
 	//during take off, detect if the drone has a large attitude. Then temporarily kill the motors.
 	matrix::Eulerf eul = matrix::Quatf(_att.q);
-	float max_att = fabs(eul.psi());
+	float max_att = fabs(eul.phi());
 	if (fabs(eul.theta()) > max_att)
 			max_att = fabs(eul.theta());
 
