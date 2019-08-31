@@ -135,7 +135,7 @@ void LandingTargetEstimator::update()
 		return;
 	}
 
-	if (!PX4_ISFINITE(_irlockReport.pos_y) || !PX4_ISFINITE(_irlockReport.pos_x)) {
+	if (!PX4_ISFINITE(_irlockReport.pos_y) || !PX4_ISFINITE(_irlockReport.pos_x) || _irlockReport.size_x < 0) {
 		return;
 	}
 
@@ -291,6 +291,8 @@ void LandingTargetEstimator::update()
 				a = 0.5f;
 			a = a / 0.5f; // normalize between 0 - 1;
 			_target_pose.raw_angle = 1.f-a;
+
+			_target_pose.marker_size = _irlockReport.size_x;
 
 			if (_targetPosePub == nullptr) {
 				_targetPosePub = orb_advertise(ORB_ID(landing_target_pose), &_target_pose);

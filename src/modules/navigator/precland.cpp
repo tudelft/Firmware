@@ -420,9 +420,8 @@ void PrecLand::update_approach(float h) {
 		angle_x_i_err+=_target_pose.angle_x;
 		angle_y_i_err+=_target_pose.angle_y;
 
-
 		//scale p gain to height:
-		float f = 1+h/_param_pld_xy_shp.get();
+		float f = 1+h/_param_pld_xy_shp.get(); // TODO: scale with _target_pose.marker_size instead?!?
 
 		ss_p_gain *=f;
 
