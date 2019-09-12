@@ -7,6 +7,8 @@ bool rel_vel_valid		# Flag showing whether relative velocity is valid
 
 float32 angle_x
 float32 angle_y
+float32 movvar
+float32 marker_size
 
 float32 x_rel			# X/north position of target, relative to vehicle (navigation frame) [meters]
 float32 y_rel			# Y/east position of target, relative to vehicle (navigation frame) [meters]

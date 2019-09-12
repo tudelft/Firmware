@@ -421,9 +421,18 @@ void PrecLand::update_approach(float h) {
 		angle_y_i_err+=_target_pose.angle_y;
 
 		//scale p gain to height:
-		float f = 1+h/_param_pld_xy_shp.get(); // TODO: scale with _target_pose.marker_size instead?!?
+        float f = 1+h/_param_pld_xy_shp.get(); // TODO: scale with _target_pose.marker_size instead?!?
+        f = 1.f/_target_pose.movvar;
+        if (isnan(f))
+            f = 1.f;
+        if (f < 0.01f)
+            f = 0.01f;
+        if (f > 10.f)
+            f = 10.f;
+//        std::cout << "movvar: " << _target_pose.movvar << " f: " << f << std::endl;
 
 		ss_p_gain *=f;
+        ss_d_gain *=f;
 
 		float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
 		float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;

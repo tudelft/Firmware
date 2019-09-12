@@ -228,6 +228,7 @@ void LandingTargetEstimator::update()
 			// only publish if both measurements were good
 
 			_target_pose.timestamp = _irlockReport.timestamp;
+			_target_pose.movvar = _irlockReport.size_y; //TMP hack
 
 			float x, xvel, y, yvel, covx, covx_v, covy, covy_v;
 			float zero_x, zero_xvel, zero_y, zero_yvel;
@@ -291,7 +292,6 @@ void LandingTargetEstimator::update()
 				a = 0.5f;
 			a = a / 0.5f; // normalize between 0 - 1;
 			_target_pose.raw_angle = 1.f-a;
-
 			_target_pose.marker_size = _irlockReport.size_x;
 
 			if (_targetPosePub == nullptr) {
