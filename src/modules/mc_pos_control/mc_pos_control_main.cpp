@@ -82,7 +82,6 @@
 #include "PositionControl.hpp"
 #include "Utility/ControlMath.hpp"
 
-#include <iostream>
 
 #define SIGMA_SINGLE_OP			0.000001f
 #define SIGMA_NORM			0.001f
@@ -3274,7 +3273,7 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 	if (fabs(eul.theta()) > max_att)
 			max_att = fabs(eul.theta());
 
-    std::cout << "max att: "  << (max_att / M_PI_F * 180.f) << ", thresh: " <<  _pelican_water_takeoff_max_att.get() << std::endl;
+    //std::cout << "max att: "  << (max_att / M_PI_F * 180.f) << ", thresh: " <<  _pelican_water_takeoff_max_att.get() << std::endl;
 	if (max_att / M_PI_F * 180.f > _pelican_water_takeoff_max_att.get() &&
 			(in_auto_takeoff() && !manual_wants_takeoff()) ) {
 		if (failed_water_takeoff == 0) {

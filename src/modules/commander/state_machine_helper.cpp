@@ -51,8 +51,6 @@
 #include "PreflightCheck.h"
 #include "arm_auth.h"
 
-#include <iostream>
-
 static constexpr const char reason_no_rc[] = "no RC";
 static constexpr const char reason_no_offboard[] = "no offboard";
 static constexpr const char reason_no_rc_and_no_offboard[] = "no RC and no offboard";

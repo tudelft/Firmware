@@ -110,8 +110,6 @@
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/uORB.h>
 
-#include <iostream>
-
 typedef enum VEHICLE_MODE_FLAG
 {
 	VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED=1, /* 0b00000001 Reserved for future use. | */
