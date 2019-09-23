@@ -314,11 +314,11 @@ void PrecLand::update_approach_land_speed(float h) {
 		//is in the range of approx [0 - a_max], when it is 0 we want to descend as fast a possible.
 		//When it's a_max stop descending.
 
-		float max_land_speed = _param_pld_v_lnd.get();
-		if (h>15)
-			max_land_speed *= 2.f;
-		if (h<5)
-			max_land_speed *= 0.5f;
+        float max_land_speed = _param_pld_v_lnd.get();
+        if (_target_pose.movvar<1)
+            max_land_speed *= 2.f;
+        if (_target_pose.movvar>3)
+            max_land_speed *= 0.5f;
 
 		float land_speed;
 		if (a<0.05f)
@@ -433,6 +433,10 @@ void PrecLand::update_approach(float h) {
 
 		ss_p_gain *=f;
         ss_d_gain *=f;
+        if (_target_pose.movvar>1)
+            ss_i_gain =0;
+        else
+            ss_i_gain *=f;
 
 		float ss_vx = ss_p_gain * _target_pose.angle_x + ss_d_gain*d_angle_x_smoothed + angle_x_i_err * ss_i_gain;
 		float ss_vy = ss_p_gain * _target_pose.angle_y + ss_d_gain*d_angle_y_smoothed + angle_y_i_err * ss_i_gain;

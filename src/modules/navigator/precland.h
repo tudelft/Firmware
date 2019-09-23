@@ -145,7 +145,7 @@ public:
 
 private:
 	void init_search_triplet();
-	void update_approach_land_speed(float h);
+    void update_approach_land_speed(float h);
 	void update_approach(float h);
 	bool in_acceptance_range();
 
