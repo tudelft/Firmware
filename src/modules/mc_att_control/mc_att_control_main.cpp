@@ -797,9 +797,17 @@ MulticopterAttitudeControl::run()
 
 				/* water-sampling -> disable motors */
 				if (busy_sampling()) {
-					_actuators.control[3] = 0.0f;
-					// and reset integrator
-					_rates_int.zero();
+					matrix::Eulerf eul = matrix::Quatf(_v_att.q);
+					float max_att = fabs(eul.phi());
+					if (fabs(eul.theta()) > max_att)
+						max_att = fabs(eul.theta());
+                    if (max_att > M_PI_F/2.f) { //are we upside down?
+						//flip back
+					} else {
+						_actuators.control[3] = 0.0f;
+						// and reset integrator
+						_rates_int.zero();
+					}
 				}
 
 
