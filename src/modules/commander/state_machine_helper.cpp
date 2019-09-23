@@ -51,6 +51,8 @@
 #include "PreflightCheck.h"
 #include "arm_auth.h"
 
+#include <iostream>
+
 static constexpr const char reason_no_rc[] = "no RC";
 static constexpr const char reason_no_offboard[] = "no offboard";
 static constexpr const char reason_no_rc_and_no_offboard[] = "no RC and no offboard";
@@ -802,6 +804,7 @@ bool check_invalid_pos_nav_state(vehicle_status_s *status, bool old_failsafe, or
 
 	if (using_global_pos && !status_flags.condition_global_position_valid) {
 		fallback_required = true;
+       // std::cout << "hoer 1" << std::endl;
 
 	} else if (!using_global_pos
 		   && (!status_flags.condition_local_position_valid || !status_flags.condition_local_velocity_valid)) {

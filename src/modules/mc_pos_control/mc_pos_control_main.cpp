@@ -82,6 +82,8 @@
 #include "PositionControl.hpp"
 #include "Utility/ControlMath.hpp"
 
+#include <iostream>
+
 #define SIGMA_SINGLE_OP			0.000001f
 #define SIGMA_NORM			0.001f
 /**
@@ -3272,6 +3274,7 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 	if (fabs(eul.theta()) > max_att)
 			max_att = fabs(eul.theta());
 
+    std::cout << "max att: "  << (max_att / M_PI_F * 180.f) << ", thresh: " <<  _pelican_water_takeoff_max_att.get() << std::endl;
 	if (max_att / M_PI_F * 180.f > _pelican_water_takeoff_max_att.get() &&
 			(in_auto_takeoff() && !manual_wants_takeoff()) ) {
 		if (failed_water_takeoff == 0) {
@@ -3359,37 +3362,30 @@ void MulticopterPositionControl::send_lockdown_command(bool lockdown)
 		mavlink_log_critical(&_mavlink_log_pub, "CONTINNUUU");
 	}
 
+    {
+        // reset integrators
+        _reset_int_xy = true;
+        _reset_int_z = true;
+        _takeoff_vel_limit = -0.5f;
+    }
 
+    struct vehicle_command_s cmd = {
+        .timestamp = 0,
+        .param5 = 0.0f,
+        .param6 = 0.0f,
+        /* if the comparison matches for off (== 0) set 0.0f, 2.0f (on) else */
+        .param1 = lockdown ? 2.0f : 0.0f, /* lockdown */
+        .param2 = 0.0f,
+        .param3 = 0.0f,
+        .param4 = 0.0f,
+        .param7 = 0.0f,
+        .command = vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION,
+        .target_system = _vehicle_status.system_id,
+        .target_component = _vehicle_status.component_id
+    };
 
-	return;
-
-
-	// DON'T ACTUALLY DO LOCKDOWN
-
-//	{
-//		// reset integrators
-//		_reset_int_xy = true;
-//		_reset_int_z = true;
-//		_takeoff_vel_limit = -0.5f;
-//	}
-
-//	struct vehicle_command_s cmd = {
-//		.timestamp = 0,
-//		.param5 = 0.0f,
-//		.param6 = 0.0f,
-//		/* if the comparison matches for off (== 0) set 0.0f, 2.0f (on) else */
-//		.param1 = lockdown ? 2.0f : 0.0f, /* lockdown */
-//		.param2 = 0.0f,
-//		.param3 = 0.0f,
-//		.param4 = 0.0f,
-//		.param7 = 0.0f,
-//		.command = vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION,
-//		.target_system = _vehicle_status.system_id,
-//		.target_component = _vehicle_status.component_id
-//	};
-
-//	orb_advert_t h = orb_advertise_queue(ORB_ID(vehicle_command), &cmd, vehicle_command_s::ORB_QUEUE_LENGTH);
-//	(void)orb_unadvertise(h);
+    orb_advert_t h = orb_advertise_queue(ORB_ID(vehicle_command), &cmd, vehicle_command_s::ORB_QUEUE_LENGTH);
+    (void)orb_unadvertise(h);
 }
 
 void

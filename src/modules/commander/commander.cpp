@@ -110,6 +110,8 @@
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/uORB.h>
 
+#include <iostream>
+
 typedef enum VEHICLE_MODE_FLAG
 {
 	VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED=1, /* 0b00000001 Reserved for future use. | */
@@ -3377,6 +3379,10 @@ Commander::check_posvel_validity(const bool data_valid, const float data_accurac
 	const float req_accuracy = (was_valid ? required_accuracy * 2.5f : required_accuracy);
 
 	const bool level_check_pass = data_valid && !data_stale && (data_accuracy < req_accuracy);
+
+
+   // std::cout << "data stale" << data_stale << " accuracy: " << data_accuracy << " , reuired: " << req_accuracy << " -> " << level_check_pass << std::endl;
+
 
 	// Check accuracy with hysteresis in both test level and time
 	if (level_check_pass) {
