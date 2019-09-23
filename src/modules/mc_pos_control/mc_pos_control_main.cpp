@@ -1427,48 +1427,32 @@ MulticopterPositionControl::control_non_manual()
 	    velocity_valid &&
 	    _pos_sp_triplet.current.position_valid) {
 
-//		matrix::Vector3f ft_vel(_pos_sp_triplet.current.vx, _pos_sp_triplet.current.vy, 0.0f);
+		matrix::Vector3f ft_vel(_pos_sp_triplet.current.vx, _pos_sp_triplet.current.vy, 0.0f);
 
-//		float cos_ratio = (ft_vel * _vel_sp) / (ft_vel.length() * _vel_sp.length());
+		float cos_ratio = (ft_vel * _vel_sp) / (ft_vel.length() * _vel_sp.length());
 
-//		// only override velocity set points when uav is traveling in same direction as target and vector component
-//		// is greater than calculated position set point velocity component
+		// only override velocity set points when uav is traveling in same direction as target and vector component
+		// is greater than calculated position set point velocity component
 
-//		if (cos_ratio > 0) {
-//			ft_vel *= (cos_ratio);
-//			// min speed a little faster than target vel
-//			ft_vel += ft_vel.normalized() * 1.5f;
-//		} else {
-//			ft_vel.zero();
-//		}
+		if (cos_ratio > 0) {
+			ft_vel *= (cos_ratio);
+			// min speed a little faster than target vel
+			ft_vel += ft_vel.normalized() * 1.5f;
 
-//		_vel_sp(0) = fabsf(ft_vel(0)) > fabsf(_vel_sp(0)) ? ft_vel(0) : _vel_sp(0);
-//		_vel_sp(1) = fabsf(ft_vel(1)) > fabsf(_vel_sp(1)) ? ft_vel(1) : _vel_sp(1);
-
-		_vel_sp(0) = _pos_sp_triplet.current.vx;
-		_vel_sp(1) = _pos_sp_triplet.current.vy;
-		_run_pos_vel_control = true;
-
-		if (!_pos_sp_triplet.current.alt_valid) { //landing
-			_vel_sp(2) = _pos_sp_triplet.current.vz;
-			_run_alt_control = false;
+		} else {
+			ft_vel.zero();
 		}
 
-			// track target using velocity only
+		_vel_sp(0) = fabsf(ft_vel(0)) > fabsf(_vel_sp(0)) ? ft_vel(0) : _vel_sp(0);
+		_vel_sp(1) = fabsf(ft_vel(1)) > fabsf(_vel_sp(1)) ? ft_vel(1) : _vel_sp(1);
+
+		// track target using velocity only
+
 	} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_FOLLOW_TARGET &&
 		   velocity_valid) {
+
 		_vel_sp(0) = _pos_sp_triplet.current.vx;
 		_vel_sp(1) = _pos_sp_triplet.current.vy;
-		_run_pos_vel_control = true;
-		if (!_pos_sp_triplet.current.alt_valid) { //landing
-			_vel_sp(2) =  _pos_sp_triplet.current.vz;
-			_run_alt_control = false;
-		}
-
-	} else {
-		_vel_sp(0) = 0;
-		_vel_sp(1) = 0;
-		_run_pos_vel_control = false;
 	}
 
 	/* use constant descend rate when landing, ignore altitude setpoint */
@@ -2382,37 +2366,8 @@ MulticopterPositionControl::control_position()
 void
 MulticopterPositionControl::calculate_velocity_setpoint()
 {
-	if (_run_pos_vel_control) {
-		_run_pos_vel_control = false;
-		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1)) && _pos_sp_triplet.current.position_valid) {
-//			PX4_INFO("Vel + pos control!");
-			float xvx = (_pos_sp(0) - _pos(0)) * _pos_p(0);
-			float xvy = (_pos_sp(1) - _pos(1)) * _pos_p(1);
-
-			_vel_sp(0) += xvx;
-			_vel_sp(1) += xvy;
-		} else {
-//			PX4_INFO("Vel ONLY control!");
-		}
-
-		float maxv = _vel_max_xy_param.get();
-		if (!PX4_ISFINITE(_vel_sp(0)))
-			_vel_sp(0) = 0;
-		else if (_vel_sp(0)>maxv)
-			_vel_sp(0) = maxv;
-		else if (_vel_sp(0)<-maxv)
-			_vel_sp(0) = -maxv;
-		if (!PX4_ISFINITE(_vel_sp(1)))
-			_vel_sp(1) = 0;
-		else if (_vel_sp(1)>maxv)
-			_vel_sp(1) = maxv;
-		else if (_vel_sp(1)<-maxv)
-			_vel_sp(1) = -maxv;
-
-
-		/* run position & altitude controllers, if enabled (otherwise use already computed velocity setpoints) */
-	} else if (_run_pos_control) {
-//		PX4_INFO("Static Pos control");
+	/* run position & altitude controllers, if enabled (otherwise use already computed velocity setpoints) */
+	if (_run_pos_control) {
 
 		// If for any reason, we get a NaN position setpoint, we better just stay where we are.
 		if (PX4_ISFINITE(_pos_sp(0)) && PX4_ISFINITE(_pos_sp(1))) {
