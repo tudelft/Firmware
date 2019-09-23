@@ -239,7 +239,7 @@ bool MulticopterLandDetector::_get_maybe_landed_state()
 		// if this persists for 8 seconds AND the drone is not
 		// falling consider it to be landed. This should even sustain
 		// quite acrobatic flight.
-		return (_min_trust_start > 0) && (hrt_elapsed_time(&_min_trust_start) > 8_s);
+		return (_min_trust_start > 0) && (hrt_elapsed_time(&_min_trust_start) > 4_s);
 	}
 
 	if (_ground_contact_hysteresis.get_state() && _has_minimal_thrust() && !rotating) {
