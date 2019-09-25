@@ -236,6 +236,7 @@ private:
 		(ParamFloat<px4::params::RC_FLT_SMP_RATE>) _rc_flt_smp_rate,
 		(ParamFloat<px4::params::MPC_ACC_HOR_ESTM>) _acc_max_estimator_xy,
 		(ParamFloat<px4::params::PEL_WT_ATT_MAX>) _pelican_water_takeoff_max_att,
+        	(ParamFloat<px4::params::PEL_WT_ATT_FLIP>) _pelican_water_takeoff_flip_att,
 		(ParamFloat<px4::params::PEL_WT_RETRY_T>) _pelican_water_takeoff_retry_time
 
 	);
@@ -3275,6 +3276,7 @@ MulticopterPositionControl::set_takeoff_velocity(float &vel_sp_z)
 
     //std::cout << "max att: "  << (max_att / M_PI_F * 180.f) << ", thresh: " <<  _pelican_water_takeoff_max_att.get() << std::endl;
 	if (max_att / M_PI_F * 180.f > _pelican_water_takeoff_max_att.get() &&
+        max_att / M_PI_F * 180.f < _pelican_water_takeoff_flip_att.get() &&
 			(in_auto_takeoff() && !manual_wants_takeoff()) ) {
 		if (failed_water_takeoff == 0) {
 			//disarm/kill/terminate/whatever
