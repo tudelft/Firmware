@@ -374,9 +374,15 @@ void PrecLand::update_approach(float h) {
 		angle_y_i_err = 0;
 	}
 
-	if (h > 10 || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
-		pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
-		pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
+	if ((h > 10) || no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) { //assume no sudden changes in marker speed are happening when the drone is in low landing
+		if (no_v_diff_cnt >  _param_v_diff_cnt_tresh.get()) {//when v is matched, assume the ship doesn't make sudden changes in speed
+			pos_sp_triplet->current.vx = vx_smthr.addSample(vx_smthr.get_latest()*0.9f + _target_pose.vx_abs*0.1f);
+			pos_sp_triplet->current.vy = vy_smthr.addSample(vy_smthr.get_latest()*0.9f + _target_pose.vy_abs*0.1f);
+		} else {
+			pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
+			pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
+		}
+		std::cout << "no_v_diff_cnt: " << no_v_diff_cnt << std::endl;
 	} else { // this prevents oscilations
 		pos_sp_triplet->current.vx = vx_smthr.get_latest();
 		pos_sp_triplet->current.vy = vy_smthr.get_latest();
