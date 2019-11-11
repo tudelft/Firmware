@@ -128,14 +128,13 @@ void LandingTargetEstimator::update()
 	// mark this sensor measurement as consumed
 	_new_irlockReport = false;
 
-//	std::cout << "Bla 2: " << _vehicleAttitude_valid << " " << _vehicleLocalPosition_valid << " " << _vehicleLocalPosition.dist_bottom_valid <<std::endl;
-
 	if (!_vehicleAttitude_valid || !_vehicleLocalPosition_valid) {
 		// don't have the data needed for an update
 		return;
 	}
 
-	if (!PX4_ISFINITE(_irlockReport.pos_y) || !PX4_ISFINITE(_irlockReport.pos_x) || _irlockReport.size_x < 0) {
+	if (!PX4_ISFINITE(_irlockReport.pos_y) || !PX4_ISFINITE(_irlockReport.pos_x) || _irlockReport.size_x < 0 || _irlockReport.size_x < 0 || _irlockReport.size_y < 0) {
+		_target_pose.detected = false;
 		return;
 	}
 
@@ -172,7 +171,7 @@ void LandingTargetEstimator::update()
 	float alpha = sqrtf(powf(sensor_ray(0),2) + powf(sensor_ray(1),2));
 	float dist_to_marker = dist / cosf(alpha);
 
-//	PX4_INFO("a: %f z: %f -> d2m: %f" , static_cast<double>(alpha),static_cast<double>(dist),static_cast<double>(dist_to_marker));
+	//	PX4_INFO("a: %f z: %f -> d2m: %f" , static_cast<double>(alpha),static_cast<double>(dist),static_cast<double>(dist_to_marker));
 
 	// scale the ray such that the z component has length of dist
 	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist_to_marker;
@@ -180,6 +179,8 @@ void LandingTargetEstimator::update()
 
 	_zero_rel_pos(0) = zero_ray(0) / zero_ray(2) * dist;
 	_zero_rel_pos(1) = zero_ray(1) / zero_ray(2) * dist;
+
+
 
 	float x_abs = _rel_pos(0) + _vehicleLocalPosition.x;
 	float y_abs = _rel_pos(1) + _vehicleLocalPosition.y;
@@ -224,12 +225,15 @@ void LandingTargetEstimator::update()
 			_zero_faulty = false;
 		}
 
+		_target_pose.angle_x = zero_ray(0);
+		_target_pose.angle_y = zero_ray(1);
+		_target_pose.timestamp = _irlockReport.timestamp;
+		_target_pose.movvar_x = _irlockReport.size_y;// image x = body y TODO: rotate to body with _R_att!?
+		_target_pose.movvar_y = _irlockReport.size_x;
+		_target_pose.detected = true;
+
 		if (!_faulty) {
-			// only publish if both measurements were good
-
-			_target_pose.timestamp = _irlockReport.timestamp;
-			_target_pose.movvar = _irlockReport.size_y; //TMP hack
-
+			// only add if both measurements were good
 			float x, xvel, y, yvel, covx, covx_v, covy, covy_v;
 			float zero_x, zero_xvel, zero_y, zero_yvel;
 			_kalman_filter_x.getState(x, xvel);
@@ -262,8 +266,7 @@ void LandingTargetEstimator::update()
 			_target_pose.cov_y_rel = covy;
 			_target_pose.cov_vx_rel = covx_v;
 			_target_pose.cov_vy_rel = covy_v;
-			_target_pose.angle_x = zero_ray(0);
-			_target_pose.angle_y = zero_ray(1);
+
 
 			_target_pose.zero_rel_pos_valid = !_zero_faulty;
 			_target_pose.zero_x_rel = zero_x-_vehicleLocalPosition.x;
@@ -292,17 +295,24 @@ void LandingTargetEstimator::update()
 				a = 0.5f;
 			a = a / 0.5f; // normalize between 0 - 1;
 			_target_pose.raw_angle = 1.f-a;
-			_target_pose.marker_size = _irlockReport.size_x;
 
-			if (_targetPosePub == nullptr) {
-				_targetPosePub = orb_advertise(ORB_ID(landing_target_pose), &_target_pose);
 
-			} else {
-				orb_publish(ORB_ID(landing_target_pose), _targetPosePub, &_target_pose);
-			}
 
 			_last_update = hrt_absolute_time();
 			_last_predict = _last_update;
+		} else {
+			_target_pose.abs_pos_valid = false;
+			_target_pose.zero_abs_pos_valid = false;
+			_target_pose.rel_pos_valid = false;
+			_target_pose.rel_vel_valid = false;
+			_target_pose.zero_abs_pos_valid = false;
+		}
+
+		if (_targetPosePub == nullptr) {
+			_targetPosePub = orb_advertise(ORB_ID(landing_target_pose), &_target_pose);
+
+		} else {
+			orb_publish(ORB_ID(landing_target_pose), _targetPosePub, &_target_pose);
 		}
 
 		float innov_x, innov_cov_x, innov_y, innov_cov_y;

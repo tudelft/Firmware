@@ -2,12 +2,14 @@
 
 bool is_static			# Flag indicating whether the landing target is static or moving with respect to the ground
 
+bool detected
 bool rel_pos_valid		# Flag showing whether relative position is valid
 bool rel_vel_valid		# Flag showing whether relative velocity is valid
 
 float32 angle_x
 float32 angle_y
-float32 movvar
+float32 movvar_x
+float32 movvar_y
 float32 marker_size
 
 float32 x_rel			# X/north position of target, relative to vehicle (navigation frame) [meters]

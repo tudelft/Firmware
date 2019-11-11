@@ -160,7 +160,7 @@ private:
 
 	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
-	Smoother_10 d_angle_x_smthr,d_angle_y_smthr,land_speed_smthr;
+	Smoother_10 angle_y_smthr,land_speed_smthr;
 
 	float angle_x_i_err = 0; //TODO: i controller may not be needed. Remove?
 	float angle_y_i_err = 0;
