@@ -369,11 +369,11 @@ void PrecLand::update_approach(float h) {
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 
-	//double lat, lon;
-	//map_projection_reproject(&_map_ref, _target_pose.x_abs,_target_pose.y_abs, &lat, &lon);
+	double lat, lon;
+	map_projection_reproject(&_map_ref, _target_pose.x_abs,_target_pose.y_abs, &lat, &lon);
 
-	//	pos_sp_triplet->current.lat = lat;
-	//	pos_sp_triplet->current.lon = lon;
+	pos_sp_triplet->current.lat = lat;
+	pos_sp_triplet->current.lon = lon;
 	if (no_v_diff_cnt < _param_v_diff_cnt_tresh.get()) {
 		// reset integrator error when marker v estimation is still stabilizing
 		angle_x_i_err = 0;
