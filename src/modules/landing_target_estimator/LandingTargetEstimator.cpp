@@ -141,26 +141,6 @@ void LandingTargetEstimator::update()
 	// TODO account for sensor orientation as set by parameter
 	// default orientation has camera x pointing in body y, camera y in body -x
 
-	matrix::Vector<float, 3> sensor_ray; // ray pointing towards target in body frame
-	sensor_ray(0) = -_moving_marker_report.angle_y * _params.scale_y; // forward
-	sensor_ray(1) = _moving_marker_report.angle_x * _params.scale_x; // right
-	sensor_ray(2) = 1.0f;
-
-	matrix::Vector<float, 3> zero_ray; // to check what would be the projected location of a target if it would be in the middle of the image
-	zero_ray(0) = sensor_ray(0);
-	zero_ray(1) = sensor_ray(1);
-	zero_ray(2) = sensor_ray(2);
-
-	// rotate the unit ray into the navigation frame, assume sensor frame = body frame
-	matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
-	_R_att = matrix::Dcm<float>(q_att);
-	sensor_ray = _R_att * sensor_ray;
-	//zero_ray = _R_att * zero_ray;
-
-	if (fabsf(sensor_ray(2)) < 1e-6f) {
-		// z component of measurement unsafe, don't use this measurement
-		return;
-	}
 
 	float dist = _vehicleLocalPosition.dist_bottom;
 
@@ -172,19 +152,12 @@ void LandingTargetEstimator::update()
 		}
 	}
 
-	float alpha = sqrtf(powf(sensor_ray(0), 2) + powf(sensor_ray(1), 2));
+	float alpha = sqrtf(powf(_moving_marker_report.angle_y, 2) + powf(_moving_marker_report.angle_x, 2));
 	float dist_to_marker = dist / cosf(alpha);
 
-	//	PX4_INFO("a: %f z: %f -> d2m: %f" , static_cast<double>(alpha),static_cast<double>(dist),static_cast<double>(dist_to_marker));
-
 	// scale the ray such that the z component has length of dist
-	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist_to_marker;
-	_rel_pos(1) = sensor_ray(1) / sensor_ray(2) * dist_to_marker;
-
-	_zero_rel_pos(0) = zero_ray(0) / zero_ray(2) * dist;
-	_zero_rel_pos(1) = zero_ray(1) / zero_ray(2) * dist;
-
-
+	_rel_pos(0) = sinf(_moving_marker_report.angle_y) * dist_to_marker;
+	_rel_pos(1) = sinf(_moving_marker_report.angle_x) * dist_to_marker;
 
 	float x_abs = _rel_pos(0) + _vehicleLocalPosition.x;
 	float y_abs = _rel_pos(1) + _vehicleLocalPosition.y;
@@ -229,10 +202,10 @@ void LandingTargetEstimator::update()
 			_zero_faulty = false;
 		}
 
-		_target_pose.angle_x = zero_ray(0);
-		_target_pose.angle_y = zero_ray(1);
+		_target_pose.angle_x = _moving_marker_report.angle_y;
+		_target_pose.angle_y = _moving_marker_report.angle_x;
 		_target_pose.timestamp = _moving_marker_report.timestamp;
-		_target_pose.movvar_x = _moving_marker_report.movvar_y;// image x = body y TODO: rotate to body with _R_att!?
+		_target_pose.movvar_x = _moving_marker_report.movvar_y;
 		_target_pose.movvar_y = _moving_marker_report.movvar_x;
 		_target_pose.detected = true;
 		_target_pose.marker_size = _moving_marker_report.size;
@@ -292,19 +265,7 @@ void LandingTargetEstimator::update()
 				_target_pose.zero_abs_pos_valid = false;
 			}
 
-			float a;
-			if (fabs(sensor_ray(0)) > fabs(sensor_ray(1))) {
-				a = fabs(sensor_ray(0));
-			} else {
-				a = fabs(sensor_ray(1));
-			}
-
-			if (a > 0.4f) { // 30 degrees, cause realsense FOV. Todo: width FOV is bigger, need to split
-				a = 0.5f;
-			}
-
-			a = a / 0.5f; // normalize between 0 - 1;
-			_target_pose.raw_angle = 1.f - a;
+			_target_pose.raw_angle = -666; // TODO remove
 
 			_last_update = hrt_absolute_time();
 			_last_predict = _last_update;

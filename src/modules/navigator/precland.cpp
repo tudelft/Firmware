@@ -347,10 +347,10 @@ void PrecLand::update_approach_land_speed(float h) {
 			float a = sqrtf(powf(fabs(_target_pose.angle_x),2)+powf(fabs(_target_pose.angle_y),2));
 			if (pos_control_enabled) {
 				mavlink_log_info(&mavlink_log_pub, "Catching up a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
-				std::cout << "Catching up: " << a << std::endl;
+//				std::cout << "Catching up: " << a << std::endl;
 			} else {
 				mavlink_log_info(&mavlink_log_pub, "Positioning a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom,(double)h );
-				std::cout << "Positioning: " << a << std::endl;
+//				std::cout << "Positioning: " << a << std::endl;
 			}
 		}
 
@@ -413,7 +413,7 @@ void PrecLand::update_approach(float h) {
 	body_angle_x_prev = body_angle_x;
 	body_angle_y_prev = body_angle_y;
 
-	std::cout << "distance: " << _target_pose.marker_distance << " size: " << _target_pose.marker_size << std::endl;
+//    std::cout << "Marker size: " << _target_pose.marker_size << std::endl;
 
 	t_prev = _target_pose.timestamp;
 
@@ -444,7 +444,7 @@ void PrecLand::update_approach(float h) {
 
 //		fx = 1; //TMP science test  use p = 7, d = 12 to be on edge of osc
 //		fy = 1; //TMP science test
-		std::cout << "1/ movvar x: " << fx << "  y: " << fy << std::endl;
+//		std::cout << "1/ movvar x: " << fx << "  y: " << fy << std::endl;
 
 		float ss_p_gain_x =ss_p_gain*fx;
 		float ss_p_gain_y =ss_p_gain*fy;
@@ -482,10 +482,13 @@ void PrecLand::update_approach(float h) {
 	pos_sp_triplet->current.yawspeed_valid = false;
 	_navigator->set_position_setpoint_triplet_updated();
 
-//	std::cout << _target_pose.timestamp / 1000000.f << "; " << _target_pose.vx_rel << "; " << _target_pose.vy_rel << "; "
-//		  << _target_pose.vx_abs << "; " << _target_pose.vy_abs << "; "
-//		  << _target_pose.angle_x << "; " << _target_pose.angle_y << "; "  << _target_pose.movvar << "; "
-//		  << pos_sp_triplet->current.vx << "; " << pos_sp_triplet->current.vy << "; " << std::endl;
+	std::cout << _target_pose.timestamp / 1000000.f << "; "
+		  << euler.phi() << "; " << euler.theta() << "; "
+		  << _target_pose.angle_x << "; " << _target_pose.angle_y << "; "
+		  << _target_pose.movvar_x << "; "  << _target_pose.movvar_y << "; "
+		  << _target_pose.vx_abs << "; " << _target_pose.vy_abs << "; "
+		  << _target_pose.vx_rel << "; " << _target_pose.vy_rel << "; "
+		  << pos_sp_triplet->current.vx << "; " << pos_sp_triplet->current.vy << "; " << std::endl;
 }
 
 bool PrecLand::in_acceptance_range() {
