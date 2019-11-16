@@ -58,7 +58,7 @@ LandingTargetEstimator::LandingTargetEstimator() :
 	_vehicleLocalPosition_valid(false),
 	_vehicleAttitude_valid(false),
 	_sensorBias_valid(false),
-	_new_irlockReport(false),
+	_new_moving_marker_report(false),
 	_estimator_initialized(false),
 	_faulty(false),
 	_last_predict(0),
@@ -120,20 +120,20 @@ void LandingTargetEstimator::update()
 		}
 	}
 
-	if (!_new_irlockReport) {
-		// nothing to do
+	if (!_new_moving_marker_report) {
 		return;
 	}
 
 	// mark this sensor measurement as consumed
-	_new_irlockReport = false;
+	_new_moving_marker_report = false;
 
 	if (!_vehicleAttitude_valid || !_vehicleLocalPosition_valid) {
 		// don't have the data needed for an update
 		return;
 	}
 
-	if (!PX4_ISFINITE(_irlockReport.pos_y) || !PX4_ISFINITE(_irlockReport.pos_x) || _irlockReport.size_x < 0 || _irlockReport.size_x < 0 || _irlockReport.size_y < 0) {
+	if (!PX4_ISFINITE(_moving_marker_report.angle_x) || !PX4_ISFINITE(_moving_marker_report.angle_y)
+			|| _moving_marker_report.size < 0) {
 		_target_pose.detected = false;
 		return;
 	}
@@ -142,8 +142,8 @@ void LandingTargetEstimator::update()
 	// default orientation has camera x pointing in body y, camera y in body -x
 
 	matrix::Vector<float, 3> sensor_ray; // ray pointing towards target in body frame
-	sensor_ray(0) = -_irlockReport.pos_y * _params.scale_y; // forward
-	sensor_ray(1) = _irlockReport.pos_x * _params.scale_x; // right
+	sensor_ray(0) = -_moving_marker_report.angle_y * _params.scale_y; // forward
+	sensor_ray(1) = _moving_marker_report.angle_x * _params.scale_x; // right
 	sensor_ray(2) = 1.0f;
 
 	matrix::Vector<float, 3> zero_ray; // to check what would be the projected location of a target if it would be in the middle of the image
@@ -163,12 +163,16 @@ void LandingTargetEstimator::update()
 	}
 
 	float dist = _vehicleLocalPosition.dist_bottom;
-	if (dist>5){
+
+	if (dist > 5) {
 		dist = -_vehicleLocalPosition.z;
-		if (dist<5)
-			dist=5;
+
+		if (dist < 5) {
+			dist = 5;
+		}
 	}
-	float alpha = sqrtf(powf(sensor_ray(0),2) + powf(sensor_ray(1),2));
+
+	float alpha = sqrtf(powf(sensor_ray(0), 2) + powf(sensor_ray(1), 2));
 	float dist_to_marker = dist / cosf(alpha);
 
 	//	PX4_INFO("a: %f z: %f -> d2m: %f" , static_cast<double>(alpha),static_cast<double>(dist),static_cast<double>(dist_to_marker));
@@ -218,7 +222,7 @@ void LandingTargetEstimator::update()
 		}
 		if (!zero_update_x || !zero_update_y) {
 			if (!_zero_faulty) {
-				_zero_faulty=true;
+				_zero_faulty = true;
 				PX4_WARN("Landing target zero measurement rejected:%s%s", zero_update_x ? "" : " x", zero_update_y ? "" : " y");
 			}
 		} else {
@@ -227,10 +231,12 @@ void LandingTargetEstimator::update()
 
 		_target_pose.angle_x = zero_ray(0);
 		_target_pose.angle_y = zero_ray(1);
-		_target_pose.timestamp = _irlockReport.timestamp;
-		_target_pose.movvar_x = _irlockReport.size_y;// image x = body y TODO: rotate to body with _R_att!?
-		_target_pose.movvar_y = _irlockReport.size_x;
+		_target_pose.timestamp = _moving_marker_report.timestamp;
+		_target_pose.movvar_x = _moving_marker_report.movvar_y;// image x = body y TODO: rotate to body with _R_att!?
+		_target_pose.movvar_y = _moving_marker_report.movvar_x;
 		_target_pose.detected = true;
+		_target_pose.marker_size = _moving_marker_report.size;
+		_target_pose.marker_distance = _moving_marker_report.distance;
 
 		if (!_faulty) {
 			// only add if both measurements were good
@@ -249,7 +255,7 @@ void LandingTargetEstimator::update()
 
 			_target_pose.rel_pos_valid = !_faulty;
 			_target_pose.rel_vel_valid = !_faulty;
-			_target_pose.x_rel = x-_vehicleLocalPosition.x;
+			_target_pose.x_rel = x - _vehicleLocalPosition.x;
 			_target_pose.y_rel = y - _vehicleLocalPosition.y;
 			_target_pose.z_rel = dist;
 			if (_vehicleLocalPosition.v_xy_valid) {
@@ -269,8 +275,8 @@ void LandingTargetEstimator::update()
 
 
 			_target_pose.zero_rel_pos_valid = !_zero_faulty;
-			_target_pose.zero_x_rel = zero_x-_vehicleLocalPosition.x;
-			_target_pose.zero_y_rel = zero_y-_vehicleLocalPosition.y;
+			_target_pose.zero_x_rel = zero_x - _vehicleLocalPosition.x;
+			_target_pose.zero_y_rel = zero_y - _vehicleLocalPosition.y;
 
 			if (_vehicleLocalPosition_valid && _vehicleLocalPosition.xy_valid) {
 				_target_pose.x_abs = x;
@@ -287,16 +293,18 @@ void LandingTargetEstimator::update()
 			}
 
 			float a;
-			if (fabs(sensor_ray(0)) > fabs(sensor_ray(1)))
+			if (fabs(sensor_ray(0)) > fabs(sensor_ray(1))) {
 				a = fabs(sensor_ray(0));
-			else
+			} else {
 				a = fabs(sensor_ray(1));
-			if (a>0.4f) // 30 degrees, cause realsense FOV. Todo: width FOV is bigger, need to split
+			}
+
+			if (a > 0.4f) { // 30 degrees, cause realsense FOV. Todo: width FOV is bigger, need to split
 				a = 0.5f;
+			}
+
 			a = a / 0.5f; // normalize between 0 - 1;
-			_target_pose.raw_angle = 1.f-a;
-
-
+			_target_pose.raw_angle = 1.f - a;
 
 			_last_update = hrt_absolute_time();
 			_last_predict = _last_update;
@@ -319,7 +327,7 @@ void LandingTargetEstimator::update()
 		_kalman_filter_x.getInnovations(innov_x, innov_cov_x);
 		_kalman_filter_y.getInnovations(innov_y, innov_cov_y);
 
-		_target_innovations.timestamp = _irlockReport.timestamp;
+		_target_innovations.timestamp = _moving_marker_report.timestamp;
 		_target_innovations.innov_x = innov_x;
 		_target_innovations.innov_cov_x = innov_cov_x;
 		_target_innovations.innov_y = innov_y;
@@ -356,18 +364,16 @@ void LandingTargetEstimator::_initialize_topics()
 	_vehicleLocalPositionSub = orb_subscribe(ORB_ID(vehicle_local_position));
 	_attitudeSub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_sensorBiasSub = orb_subscribe(ORB_ID(sensor_bias));
-	_irlockReportSub = orb_subscribe(ORB_ID(irlock_report));
+	_moving_marker_reportSub = orb_subscribe(ORB_ID(moving_marker_report));
 	_parameterSub = orb_subscribe(ORB_ID(parameter_update));
 }
 
 void LandingTargetEstimator::_update_topics()
 {
-	_vehicleLocalPosition_valid = _orb_update(ORB_ID(vehicle_local_position), _vehicleLocalPositionSub,
-						  &_vehicleLocalPosition);
+	_vehicleLocalPosition_valid = _orb_update(ORB_ID(vehicle_local_position), _vehicleLocalPositionSub, &_vehicleLocalPosition);
 	_vehicleAttitude_valid = _orb_update(ORB_ID(vehicle_attitude), _attitudeSub, &_vehicleAttitude);
 	_sensorBias_valid = _orb_update(ORB_ID(sensor_bias), _sensorBiasSub, &_sensorBias);
-
-	_new_irlockReport = _orb_update(ORB_ID(irlock_report), _irlockReportSub, &_irlockReport);
+	_new_moving_marker_report = _orb_update(ORB_ID(moving_marker_report), _moving_marker_reportSub, &_moving_marker_report);
 }
 
 

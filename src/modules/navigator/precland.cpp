@@ -159,7 +159,7 @@ PrecLand::on_active()
 		orb_copy(ORB_ID(vehicle_attitude), _attitudeSub, &_vehicleAttitude);
 
 	if (_target_pose_initialised) {
-		if (_target_pose.detected){
+		if (_target_pose.detected) {
 			time_since_last_sighting = (hrt_absolute_time() - _target_pose.timestamp);
 			time_since_last_sighting /= SEC2USEC;
 		}
@@ -175,7 +175,7 @@ PrecLand::on_active()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	float h = vehicle_local_position->dist_bottom;
-	if (h>5 && !_param_marker_distance_type.get()){
+	if (h>5 && !_param_marker_distance_type.get()) {
 		h = -vehicle_local_position->z;
 		if (h<5)
 			h=5;
@@ -190,7 +190,7 @@ PrecLand::on_active()
 		// fallthrough
 	} case PrecLandState::WaitForTarget: {
 		// check if we can see the target, and have a valid estimates
-		if (!(debug_msg_div % 12) ){
+		if (!(debug_msg_div % 12) ) {
 			mavlink_log_info(&mavlink_log_pub, "Searching d2b: %.2f h: %.2f alt: %.2f ref: %.2f", (double)vehicle_local_position->dist_bottom, (double) h,(double)_navigator->get_global_position()->alt,(double)vehicle_local_position->ref_alt);
 		}
 		if ( time_since_last_sighting < 1.f ) {
@@ -252,7 +252,7 @@ PrecLand::on_active()
 
 			_navigator->set_position_setpoint_triplet_updated();
 
-			if (!(debug_msg_div % 12) ){
+			if (!(debug_msg_div % 12) ) {
 				mavlink_log_info(&mavlink_log_pub, "Lost lvz: %.2f d2b: %.2f h: %.2f", (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom, (double) h);
 			}
 
@@ -304,9 +304,9 @@ void PrecLand::update_approach_land_speed(float h) {
 
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 
-	if (h<_param_final_approach_alt.get()){
+	if (h<_param_final_approach_alt.get()) {
 		land_speed_smthr.addSample(0.5f*_param_pld_v_lnd.get());
-	} else if(in_acceptance_range() && time_since_last_sighting < 1.f ){
+	} else if(in_acceptance_range() && time_since_last_sighting < 1.f ) {
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
 		float a_max = 0.4f; //this is camera (fov) dependent
 		//is in the range of approx [0 - a_max], when it is 0 we want to descend as fast a possible.
@@ -314,12 +314,14 @@ void PrecLand::update_approach_land_speed(float h) {
 
 		float max_land_speed = _param_pld_v_lnd.get();
 		float biggest_movvar = _target_pose.movvar_x;
-		if (_target_pose.movvar_y > _target_pose.movvar_x)
-			biggest_movvar = _target_pose.movvar_y;
-		if (biggest_movvar<1)
-			max_land_speed *= 2.f;
-		if (biggest_movvar>3)
-			max_land_speed *= 0.5f;
+//		if (_target_pose.movvar_y > _target_pose.movvar_x)
+//			biggest_movvar = _target_pose.movvar_y;
+//		if (biggest_movvar<1)
+//			max_land_speed *= 2.f;
+//		if (biggest_movvar>3)
+//			max_land_speed *= 0.5f;
+
+		max_land_speed  *= biggest_movvar;
 
 		float land_speed;
 		if (a<0.05f)
@@ -340,10 +342,10 @@ void PrecLand::update_approach_land_speed(float h) {
 			mavlink_log_info(&mavlink_log_pub, "Descending  a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
 	} else {
 
-		if (!(debug_msg_div % 12) ){
+		if (!(debug_msg_div % 12) ) {
 			bool pos_control_enabled = no_v_diff_cnt < _param_v_diff_cnt_tresh.get()+2;
 			float a = sqrtf(powf(fabs(_target_pose.angle_x),2)+powf(fabs(_target_pose.angle_y),2));
-			if (pos_control_enabled){
+			if (pos_control_enabled) {
 				mavlink_log_info(&mavlink_log_pub, "Catching up a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
 				std::cout << "Catching up: " << a << std::endl;
 			} else {
@@ -378,12 +380,12 @@ void PrecLand::update_approach(float h) {
 		angle_y_i_err = 0;
 	}
 
-	if (h > 10) { //assume no sudden changes in marker speed are happening when the drone is in low landing
-		if (no_v_diff_cnt >  _param_v_diff_cnt_tresh.get()) {//when v is matched, assume the ship doesn't make sudden changes in speed
+	if(h > 10 && _target_pose.abs_pos_valid) { //assume no sudden changes in marker speed are happening when the drone is in low landing
+		if(no_v_diff_cnt > _param_v_diff_cnt_tresh.get()) {//when v is matched, assume the ship doesn't make sudden changes in speed
 			//this acts as a sort of I gain
-			//TMP DISABLED!
-			//pos_sp_triplet->current.vx = vx_smthr.addSample(vx_smthr.get_latest()*0.9f + _target_pose.vx_abs*0.1f);
-			//pos_sp_triplet->current.vy = vy_smthr.addSample(vy_smthr.get_latest()*0.9f + _target_pose.vy_abs*0.1f);
+			pos_sp_triplet->current.vx = vx_smthr.addSample(vx_smthr.get_latest()*0.9f + _target_pose.vx_abs*0.1f);
+			pos_sp_triplet->current.vy = vy_smthr.addSample(vy_smthr.get_latest()*0.9f + _target_pose.vy_abs*0.1f);
+
 		} else {
 			pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
 			pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
@@ -411,6 +413,7 @@ void PrecLand::update_approach(float h) {
 	body_angle_x_prev = body_angle_x;
 	body_angle_y_prev = body_angle_y;
 
+	std::cout << "distance: " << _target_pose.marker_distance << " size: " << _target_pose.marker_size << std::endl;
 
 	t_prev = _target_pose.timestamp;
 
@@ -463,7 +466,7 @@ void PrecLand::update_approach(float h) {
 
 	}
 
-	if (!_param_only_flw.get()){
+	if (!_param_only_flw.get()) {
 		pos_sp_triplet->current.vz = land_speed_smthr.get_latest();
 		pos_sp_triplet->current.alt_valid = false;
 	} else {
@@ -550,7 +553,7 @@ float Smoother_10::addSample(float sample)
 	if (isnan(sample)) // fixes nan, which forever destroy the output
 		sample = 0;
 	if (_kernelsize == 1)
-	{ // disable smoothing... to be sure:
+	{	// disable smoothing... to be sure:
 		_ready = true;
 		_runner = sample;
 		return sample;
@@ -561,7 +564,7 @@ float Smoother_10::addSample(float sample)
 	_runner = _runner + sample - _rbuf(_rotater); //add new sample, subtract the new oldest sample
 
 	if (!_ready)
-	{ // check if completely filled
+	{	// check if completely filled
 		if (_rotater == 0)
 			_ready = true;
 		else
@@ -620,7 +623,7 @@ float Smoother_100::addSample(float sample)
 	if (isnan(sample)) // fixes nan, which forever destroy the output
 		sample = 0;
 	if (_kernelsize == 1)
-	{ // disable smoothing... to be sure:
+	{	// disable smoothing... to be sure:
 		_ready = true;
 		_runner = sample;
 		return sample;
@@ -631,7 +634,7 @@ float Smoother_100::addSample(float sample)
 	_runner = _runner + sample - _rbuf(_rotater); //add new sample, subtract the new oldest sample
 
 	if (!_ready)
-	{ // check if completely filled
+	{	// check if completely filled
 		if (_rotater == 0)
 			_ready = true;
 		else

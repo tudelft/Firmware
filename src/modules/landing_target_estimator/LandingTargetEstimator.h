@@ -49,7 +49,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/sensor_bias.h>
-#include <uORB/topics/irlock_report.h>
+#include <uORB/topics/moving_marker_report.h>
 #include <uORB/topics/landing_target_pose.h>
 #include <uORB/topics/landing_target_innovations.h>
 #include <uORB/topics/parameter_update.h>
@@ -141,18 +141,18 @@ private:
 	int _vehicleLocalPositionSub;
 	int _attitudeSub;
 	int _sensorBiasSub;
-	int _irlockReportSub;
+	int _moving_marker_reportSub;
 
 	struct vehicle_local_position_s	_vehicleLocalPosition;
 	struct vehicle_attitude_s	_vehicleAttitude;
 	struct sensor_bias_s		_sensorBias;
-	struct irlock_report_s		_irlockReport;
+	struct moving_marker_report_s _moving_marker_report;
 
 	// keep track of which topics we have received
 	bool _vehicleLocalPosition_valid;
 	bool _vehicleAttitude_valid;
 	bool _sensorBias_valid;
-	bool _new_irlockReport;
+	bool _new_moving_marker_report;
 	bool _estimator_initialized;
 	// keep track of whether last measurement was rejected
 	bool _faulty;

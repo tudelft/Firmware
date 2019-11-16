@@ -11,6 +11,7 @@ float32 angle_y
 float32 movvar_x
 float32 movvar_y
 float32 marker_size
+float32 marker_distance
 
 float32 x_rel			# X/north position of target, relative to vehicle (navigation frame) [meters]
 float32 y_rel			# Y/east position of target, relative to vehicle (navigation frame) [meters]
