@@ -135,6 +135,12 @@ void LandingTargetEstimator::update()
 	if (!PX4_ISFINITE(_moving_marker_report.angle_x) || !PX4_ISFINITE(_moving_marker_report.angle_y)
 			|| _moving_marker_report.size < 0) {
 		_target_pose.detected = false;
+		if (_targetPosePub == nullptr) {
+			_targetPosePub = orb_advertise(ORB_ID(landing_target_pose), &_target_pose);
+
+		} else {
+			orb_publish(ORB_ID(landing_target_pose), _targetPosePub, &_target_pose);
+		}
 		return;
 	}
 
