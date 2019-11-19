@@ -160,9 +160,10 @@ PrecLand::on_active()
 
 	if (_target_pose_initialised) {
 		if (_target_pose.detected) {
-			time_since_last_sighting = (hrt_absolute_time() - _target_pose.timestamp);
-			time_since_last_sighting /= SEC2USEC;
+			time_last_sighting = hrt_absolute_time();
 		}
+		time_since_last_sighting = (hrt_absolute_time() - time_last_sighting);
+		time_since_last_sighting /= SEC2USEC;
 	} else
 		time_since_last_sighting = 2* _param_target_really_lost_timeout.get();
 
@@ -193,12 +194,13 @@ PrecLand::on_active()
 		if (!(debug_msg_div % 12) ) {
 			mavlink_log_info(&mavlink_log_pub, "Searching d2b: %.2f h: %.2f alt: %.2f ref: %.2f", (double)vehicle_local_position->dist_bottom, (double) h,(double)_navigator->get_global_position()->alt,(double)vehicle_local_position->ref_alt);
 		}
-		if ( time_since_last_sighting < 1.f ) {
+		if ( _target_pose_initialised && _target_pose.detected) {
 			_state = PrecLandState::InitApproach;
 			// fallthrough
 		} else
 			break;
 	} case PrecLandState::InitApproach: {
+		marker_size_mem=0;
 		mavlink_log_info(&mavlink_log_pub,"Target found. Approaching.");
 		_state = PrecLandState::RunApproach;
 		// fallthrough
@@ -213,24 +215,22 @@ PrecLand::on_active()
 		break;
 	} case PrecLandState::InitLost: {
 		mavlink_log_info(&mavlink_log_pub,"Target lost.");
-
 		_state = PrecLandState::RunLost;
 		// fallthrough
 	} case PrecLandState::RunLost: {
-		if ( time_since_last_sighting < 1.f) {
+		if ( _target_pose.detected) {
 			_state = PrecLandState::InitApproach;
 		} else {
 			//immidiately increase the area we are looking at
-
-
-			if (h < _param_search_alt.get() - 2 && h >_param_final_approach_alt.get() ) {
-				land_speed_smthr.addSample(_param_pld_v_up_lst.get());
-			} else if (h >_param_final_approach_alt.get())
+			if (h < _param_search_alt.get() - 2 ) {
+				land_speed_smthr.addSample(-_param_pld_v_up_lst.get());
+			} else
 				land_speed_smthr.addSample(0);
-			else
-				land_speed_smthr.addSample(_param_pld_v_lnd.get()/2.f); // final approach ignore lost just descend
 
-			if (no_v_diff_cnt < _param_v_diff_cnt_tresh.get() && h >15) {
+			if (marker_size_mem > _param_final_approach_size.get()*1.5f)
+				land_speed_smthr.addSample(0.1f*_param_pld_v_lnd.get()); // final approach ignore lost just descend
+
+			if (no_v_diff_cnt < _param_v_diff_cnt_tresh.get() && h >_param_search_alt.get()*0.75f) {
 				//assume that we've lost the target because we weren't moving fast enough
 				pos_sp_triplet->current.vx = vx_smthr.get_latest()*2;
 				pos_sp_triplet->current.vy = vy_smthr.get_latest()*2;
@@ -263,6 +263,7 @@ PrecLand::on_active()
 
 		break;
 	} case PrecLandState::Done: {
+		marker_size_mem = 0;
 		if (!(debug_msg_div % 12))
 			mavlink_log_info(&mavlink_log_pub,"Landing done!");
 		break;
@@ -303,54 +304,51 @@ void PrecLand::init_search_triplet() {
 void PrecLand::update_approach_land_speed(float h) {
 
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
+	if (_target_pose.detected)
+		marker_size_mem  = _target_pose.marker_size;
 
-	if (h<_param_final_approach_alt.get()) {
-		land_speed_smthr.addSample(0.5f*_param_pld_v_lnd.get());
-	} else if(in_acceptance_range() && time_since_last_sighting < 1.f ) {
+	if (!_target_pose.detected && marker_size_mem>_param_final_approach_size.get()) {
+		land_speed_smthr.addSample(0.1f*_param_pld_v_lnd.get());
+	} else if(in_acceptance_range() && time_since_last_sighting < 1.f ) { // todo use param
 		float a = sqrtf(powf(_target_pose.angle_x,2)+powf(_target_pose.angle_y,2));
-		float a_max = 0.4f; //this is camera (fov) dependent
+		float a_max = _param_hacc_rad.get(); //this is camera (fov) dependent
 		//is in the range of approx [0 - a_max], when it is 0 we want to descend as fast a possible.
 		//When it's a_max stop descending.
 
 		float max_land_speed = _param_pld_v_lnd.get();
-		float biggest_movvar = _target_pose.movvar_x;
-//		if (_target_pose.movvar_y > _target_pose.movvar_x)
-//			biggest_movvar = _target_pose.movvar_y;
-//		if (biggest_movvar<1)
-//			max_land_speed *= 2.f;
-//		if (biggest_movvar>3)
-//			max_land_speed *= 0.5f;
+		if  (_target_pose.marker_size<_param_final_approach_size.get()*0.75f)
+			max_land_speed*=2.f;
+		else
+			max_land_speed*=0.1f * (_param_final_approach_size.get() / _target_pose.marker_size);
 
-		max_land_speed  *= biggest_movvar;
 
 		float land_speed;
-		if (a<0.05f)
+		if (a<_param_hacc_rad.get()/4.f)
 			land_speed = max_land_speed;
-		else if (a>0.35f)
+		else if (a>_param_hacc_rad.get())
 			land_speed = 0.01f;
 		else
 			land_speed = max_land_speed * (1.f/a_max) *(a_max-a);
+
+		if  (_target_pose.marker_size>_param_final_approach_size.get() && a < 0.1f)
+			land_speed  = 0.1f*_param_pld_v_lnd.get();
 
 		if (_param_only_flw.get())
 			land_speed = 0;
 		if (land_speed<0)
 			land_speed = 0;
 
-//		std::cout << "Descending:" << land_speed_smthr.get_latest() << std::endl;
-		land_speed_smthr.addSample(land_speed);
+		land_speed_smthr.addSample(land_speed*0.1f + 0.9f*land_speed_smthr.get_latest());
 		if (!(debug_msg_div % 12))
 			mavlink_log_info(&mavlink_log_pub, "Descending  a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
 	} else {
-
 		if (!(debug_msg_div % 12) ) {
 			bool pos_control_enabled = no_v_diff_cnt < _param_v_diff_cnt_tresh.get()+2;
 			float a = sqrtf(powf(fabs(_target_pose.angle_x),2)+powf(fabs(_target_pose.angle_y),2));
 			if (pos_control_enabled) {
 				mavlink_log_info(&mavlink_log_pub, "Catching up a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(),(double)vehicle_local_position->dist_bottom,(double)h );
-//				std::cout << "Catching up: " << a << std::endl;
 			} else {
 				mavlink_log_info(&mavlink_log_pub, "Positioning a %.2f lvz: %.2f d2b: %.2f h: %.2f", (double)a, (double)land_speed_smthr.get_latest(), (double)vehicle_local_position->dist_bottom,(double)h );
-//				std::cout << "Positioning: " << a << std::endl;
 			}
 		}
 
@@ -360,11 +358,10 @@ void PrecLand::update_approach_land_speed(float h) {
 
 void PrecLand::update_approach(float h) {
 
-	static uint64_t t_prev = 0;
-	if (t_prev == _target_pose.timestamp)
-		return;
-
 	update_approach_land_speed(h);
+
+	if (!_target_pose.detected)
+		return;
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
@@ -385,7 +382,6 @@ void PrecLand::update_approach(float h) {
 			//this acts as a sort of I gain
 			pos_sp_triplet->current.vx = vx_smthr.addSample(vx_smthr.get_latest()*0.9f + _target_pose.vx_abs*0.1f);
 			pos_sp_triplet->current.vy = vy_smthr.addSample(vy_smthr.get_latest()*0.9f + _target_pose.vy_abs*0.1f);
-
 		} else {
 			pos_sp_triplet->current.vx = vx_smthr.addSample(_target_pose.vx_abs);
 			pos_sp_triplet->current.vy = vy_smthr.addSample(_target_pose.vy_abs);
@@ -394,11 +390,10 @@ void PrecLand::update_approach(float h) {
 	pos_sp_triplet->current.vx = vx_smthr.get_latest();
 	pos_sp_triplet->current.vy = vy_smthr.get_latest();
 
-	//TODO: at the moment of activating v control, calculate how much time the marker will still be in the image, and do a ff overtake
-
 	float ss_p_gain = _param_pld_xy_g_p.get(); //pos p gain
 	float ss_i_gain = _param_pld_xy_g_i.get()/100.f; // pos i gai
 	float ss_d_gain = _param_pld_xy_g_d.get(); //pos p gain
+	float ss_d_drot_gain = _param_pld_xy_g_dd.get();
 
 	//only activate pos control when drone is up to speed
 	float dv = sqrtf(powf(_target_pose.vx_rel,2) + powf(_target_pose.vy_rel,2));
@@ -413,9 +408,18 @@ void PrecLand::update_approach(float h) {
 	body_angle_x_prev = body_angle_x;
 	body_angle_y_prev = body_angle_y;
 
-//    std::cout << "Marker size: " << _target_pose.marker_size << std::endl;
-
-	t_prev = _target_pose.timestamp;
+	float drot_angle_x = body_angle_x - euler.phi();
+	float drot_angle_y = body_angle_y - euler.theta();
+	static float drot_angle_x_prev = drot_angle_x;
+	static float drot_angle_y_prev = drot_angle_y;
+	static float phi_prev = euler.phi();
+	static float theta_prev = euler.theta();
+	float d_drot_x =(drot_angle_x_prev - drot_angle_x) - (phi_prev - euler.phi());
+	float d_drot_y =(drot_angle_y_prev - drot_angle_y) - (theta_prev - euler.theta());
+	drot_angle_x_prev = drot_angle_x;
+	drot_angle_y_prev = drot_angle_y;
+	phi_prev = euler.phi();
+	theta_prev = euler.theta();
 
 	int tresh = _param_v_diff_cnt_tresh.get();
 
@@ -442,14 +446,21 @@ void PrecLand::update_approach(float h) {
 		if (fy > 40.f)
 			fy = 40.f;
 
+		if (_target_pose.marker_size < 100) {
+			fx/=2.f;
+			fy/=2.f;
+		}
+
 //		fx = 1; //TMP science test  use p = 7, d = 12 to be on edge of osc
 //		fy = 1; //TMP science test
-//		std::cout << "1/ movvar x: " << fx << "  y: " << fy << std::endl;
 
 		float ss_p_gain_x =ss_p_gain*fx;
 		float ss_p_gain_y =ss_p_gain*fy;
 		float ss_d_gain_x =ss_d_gain; //*fx;
 		float ss_d_gain_y =ss_d_gain; //*fy;
+		float ss_drot_gain_x =ss_d_drot_gain;
+		float ss_drot_gain_y =ss_d_drot_gain;
+
 		float ss_i_gain_x = ss_i_gain*fx;
 		float ss_i_gain_y = ss_i_gain*fy;
 
@@ -461,8 +472,8 @@ void PrecLand::update_approach(float h) {
 		pos_sp_triplet->current.vy += sinf(euler.psi()) * ss_vx + cosf(euler.psi()) * ss_vy;
 
 		//D was already rotated
-		pos_sp_triplet->current.vx += ss_d_gain_x*d_angle_x_err;
-		pos_sp_triplet->current.vy += ss_d_gain_y*d_angle_y_err;
+		pos_sp_triplet->current.vx += ss_d_gain_x*d_angle_x_err + ss_drot_gain_x*d_drot_x;
+		pos_sp_triplet->current.vy += ss_d_gain_y*d_angle_y_err + ss_drot_gain_y*d_drot_y;
 
 	}
 
@@ -482,13 +493,15 @@ void PrecLand::update_approach(float h) {
 	pos_sp_triplet->current.yawspeed_valid = false;
 	_navigator->set_position_setpoint_triplet_updated();
 
-	std::cout << _target_pose.timestamp / 1000000.f << "; "
-		  << euler.phi() << "; " << euler.theta() << "; "
-		  << _target_pose.angle_x << "; " << _target_pose.angle_y << "; "
-		  << _target_pose.movvar_x << "; "  << _target_pose.movvar_y << "; "
-		  << _target_pose.vx_abs << "; " << _target_pose.vy_abs << "; "
-		  << _target_pose.vx_rel << "; " << _target_pose.vy_rel << "; "
-		  << pos_sp_triplet->current.vx << "; " << pos_sp_triplet->current.vy << "; " << std::endl;
+//    std::cout << _target_pose.timestamp / 1000000.f << "; "
+//          << euler.phi() << "; " << euler.theta() << "; "
+//          << _target_pose.angle_x << "; " << _target_pose.angle_y << "; "
+//          << _target_pose.movvar_x << "; "  << _target_pose.movvar_y << "; "
+//          << _target_pose.vx_abs << "; " << _target_pose.vy_abs << "; "
+//          << _target_pose.vx_rel << "; " << _target_pose.vy_rel << "; "
+//          << body_angle_x << "; " << body_angle_y << "; "
+//          << drot_angle_x << "; " << drot_angle_y << "; "
+//          << pos_sp_triplet->current.vx << "; " << pos_sp_triplet->current.vy << "; " << std::endl;
 }
 
 bool PrecLand::in_acceptance_range() {

@@ -95,18 +95,18 @@ PARAM_DEFINE_FLOAT(PLD_SRCH_ALT, 10.0f);
 PARAM_DEFINE_FLOAT(PLD_HACC_RAD, 0.15f);
 
 /**
- * Final approach altitude
+ * Final approach size of the marker
  *
  * Allow final approach (without horizontal positioning) if losing landing target closer than this to the ground.
  *
  * @unit m
  * @min 0.0
- * @max 10
+ * @max 2000
  * @decimal 2
- * @increment 0.1
+ * @increment 1
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_FAPPR_ALT, 0.1f);
+PARAM_DEFINE_FLOAT(PLD_FAPPR_SZ, 500.f);
 
 /**
  * Only follow, don't descend
@@ -160,15 +160,15 @@ PARAM_DEFINE_FLOAT(PLD_XY_G_I, 0.00f);
 PARAM_DEFINE_FLOAT(PLD_XY_G_D, 0.8f);
 
 /**
- * Position P gain
+ * Position DD gain
  *
- * @min 1.0
- * @max 500
+ * @min 0
+ * @max 20
  * @decimal 1
  * @increment 0.05
  * @group Precision Land
  */
-PARAM_DEFINE_FLOAT(PLD_XY_SHP, 60.0f);
+PARAM_DEFINE_FLOAT(PLD_XY_G_DD, 3.5f);
 
 
 /**
@@ -187,8 +187,8 @@ PARAM_DEFINE_FLOAT(PLD_V_LND, 1.5f);
  * v up speed after lost. If the marker was found, but lost after time out. The drone goes up with max this speed.
  *
  * @unit m/s
- * @min -5.0
- * @max -0.0
+ * @min 0.0
+ * @max 5.0
  * @decimal 1
  * @increment 0.05
  * @group Precision Land

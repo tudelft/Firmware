@@ -59,14 +59,14 @@
 class Smoother_100
 {
 #define SMOOTHER_100_WIDTH 100
-  private:
+private:
 	matrix::Vector<float,SMOOTHER_100_WIDTH+1> _rbuf; // rotary buffer
 	int _kernelsize;          // filter kernel width
 	int _rotater;             //pointer to current sample in rotary buffer
 	float _runner;            // current filter output value
 	bool _ready = false;
 
-  public:
+public:
 	Smoother_100() {
 		_kernelsize = SMOOTHER_100_WIDTH;
 	}
@@ -89,14 +89,14 @@ class Smoother_100
 class Smoother_10
 {
 #define SMOOTHER_10_WIDTH 10
-  private:
+private:
 	matrix::Vector<float,SMOOTHER_10_WIDTH+1> _rbuf; // rotary buffer
 	int _kernelsize;          // filter kernel width
 	int _rotater;             //pointer to current sample in rotary buffer
 	float _runner;            // current filter output value
 	bool _ready = false;
 
-  public:
+public:
 	Smoother_10() {
 		_kernelsize = SMOOTHER_10_WIDTH;
 	}
@@ -145,7 +145,7 @@ public:
 
 private:
 	void init_search_triplet();
-    void update_approach_land_speed(float h);
+	void update_approach_land_speed(float h);
 	void update_approach(float h);
 	bool in_acceptance_range();
 
@@ -158,6 +158,8 @@ private:
 	int _attitudeSub{-1};
 	bool _v_att_updated{false}; /**< wether the landing target position message is updated */
 
+	float marker_size_mem{0};
+
 	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
 	Smoother_10 angle_y_smthr,land_speed_smthr;
@@ -166,6 +168,7 @@ private:
 	float angle_y_i_err = 0;
 	int no_v_diff_cnt;
 	float time_since_last_sighting = 999;
+	hrt_abstime time_last_sighting = 0 ;
 	Smoother_100 vx_smthr,vy_smthr;
 
 	int debug_msg_div = 0; // divider counter to limit debug messages
@@ -176,20 +179,20 @@ private:
 	PrecLandMode _mode{PrecLandMode::Required};
 
 	DEFINE_PARAMETERS(
-			(ParamFloat<px4::params::PLD_TLST_TOUT>) _param_target_lost_timeout,
-			(ParamFloat<px4::params::PLD_RLST_TOUT>) _param_target_really_lost_timeout,
-			(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
-			(ParamFloat<px4::params::PLD_HACC_RAD>) _param_hacc_rad,
-			(ParamFloat<px4::params::PLD_FAPPR_ALT>) _param_final_approach_alt,
-			(ParamInt<px4::params::PLD_ONLY_FLW>) _param_only_flw,
-			(ParamFloat<px4::params::PLD_XY_G_P>) _param_pld_xy_g_p,
-			(ParamFloat<px4::params::PLD_XY_G_I>) _param_pld_xy_g_i,
-			(ParamFloat<px4::params::PLD_XY_G_D>) _param_pld_xy_g_d,
-			(ParamFloat<px4::params::PLD_XY_SHP>) _param_pld_xy_shp,
-			(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
-			(ParamFloat<px4::params::PLD_V_U_LST>) _param_pld_v_up_lst,
-			(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh,
-			(ParamInt<px4::params::PLD_DST_TYPE>) _param_marker_distance_type
-			)
+		(ParamFloat<px4::params::PLD_TLST_TOUT>) _param_target_lost_timeout,
+		(ParamFloat<px4::params::PLD_RLST_TOUT>) _param_target_really_lost_timeout,
+		(ParamFloat<px4::params::PLD_SRCH_ALT>) _param_search_alt,
+		(ParamFloat<px4::params::PLD_HACC_RAD>) _param_hacc_rad,
+		(ParamFloat<px4::params::PLD_FAPPR_SZ>) _param_final_approach_size,
+		(ParamInt<px4::params::PLD_ONLY_FLW>) _param_only_flw,
+		(ParamFloat<px4::params::PLD_XY_G_P>) _param_pld_xy_g_p,
+		(ParamFloat<px4::params::PLD_XY_G_I>) _param_pld_xy_g_i,
+		(ParamFloat<px4::params::PLD_XY_G_D>) _param_pld_xy_g_d,
+		(ParamFloat<px4::params::PLD_XY_G_DD>) _param_pld_xy_g_dd,
+		(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
+		(ParamFloat<px4::params::PLD_V_U_LST>) _param_pld_v_up_lst,
+		(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh,
+		(ParamInt<px4::params::PLD_DST_TYPE>) _param_marker_distance_type
+	)
 
 };
