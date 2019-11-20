@@ -192,7 +192,8 @@ private:
 		(ParamFloat<px4::params::PLD_V_LND>) _param_pld_v_lnd,
 		(ParamFloat<px4::params::PLD_V_U_LST>) _param_pld_v_up_lst,
 		(ParamInt<px4::params::PLD_VD_CNT>) _param_v_diff_cnt_tresh,
-		(ParamInt<px4::params::PLD_DST_TYPE>) _param_marker_distance_type
+		(ParamInt<px4::params::PLD_DST_TYPE>) _param_marker_distance_type,
+		(ParamInt<px4::params::PLD_USE_MVVR>) _param_marker_use_movvar
 	)
 
 };

@@ -57,7 +57,7 @@
 #include <uORB/topics/vehicle_control_mode.h>
 
 
-#include <iostream>
+//#include <iostream>
 
 #define SEC2USEC 1000000.0f
 
@@ -451,8 +451,10 @@ void PrecLand::update_approach(float h) {
 			fy/=2.f;
 		}
 
-//		fx = 1; //TMP science test  use p = 7, d = 12 to be on edge of osc
-//		fy = 1; //TMP science test
+		if (!_param_marker_use_movvar.get()) {
+			fx = 1; //TMP science test  use p = 7, d = 12 to be on edge of osc
+			fy = 1; //TMP science test
+		}
 
 		float ss_p_gain_x =ss_p_gain*fx;
 		float ss_p_gain_y =ss_p_gain*fy;
