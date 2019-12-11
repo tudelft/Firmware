@@ -48,6 +48,8 @@
 #define SEC2USEC 1000000.0f
 
 
+//#include <iostream>
+
 namespace landing_target_estimator
 {
 
@@ -147,23 +149,29 @@ void LandingTargetEstimator::update()
 	// TODO account for sensor orientation as set by parameter
 	// default orientation has camera x pointing in body y, camera y in body -x
 
-
-	float dist = _vehicleLocalPosition.dist_bottom;
-
-	if (dist > 5) {
-		dist = -_vehicleLocalPosition.z;
-
-		if (dist < 5) {
-			dist = 5;
-		}
-	}
-
 	float alpha = sqrtf(powf(_moving_marker_report.angle_y, 2) + powf(_moving_marker_report.angle_x, 2));
-	float dist_to_marker = dist / cosf(alpha);
+	float dist_to_marker = _moving_marker_report.distance;
+	float dist_to_bottom = _moving_marker_report.distance * cosf(alpha);
+
+	dist_to_bottom = -_vehicleLocalPosition.z; //TMP
+	dist_to_marker = dist_to_bottom / cosf(alpha); //TMP
 
 	// scale the ray such that the z component has length of dist
-	_rel_pos(0) = sinf(_moving_marker_report.angle_y) * dist_to_marker;
-	_rel_pos(1) = sinf(_moving_marker_report.angle_x) * dist_to_marker;
+	matrix::Vector<float, 3> sensor_ray; // ray pointing towards target in body frame
+	sensor_ray(0) = _moving_marker_report.angle_y; // forward
+	sensor_ray(1) = _moving_marker_report.angle_x; // right
+	sensor_ray(2) = 1.0f;
+	// rotate the unit ray into the navigation frame, assume sensor frame = body frame
+	matrix::Quaternion<float> q_att(&_vehicleAttitude.q[0]);
+	_R_att = matrix::Dcm<float>(q_att);
+	sensor_ray = _R_att * sensor_ray;
+	// scale the ray such that the z component has length of dist
+	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist_to_marker;
+	_rel_pos(1) = sensor_ray(1) / sensor_ray(2) * dist_to_marker;
+
+	// scale the ray such that the z component has length of dist
+//    _rel_pos(0) = sinf(_moving_marker_report.angle_y) * dist_to_marker;
+//    _rel_pos(1) = sinf(_moving_marker_report.angle_x) * dist_to_marker;
 
 	float x_abs = _rel_pos(0) + _vehicleLocalPosition.x;
 	float y_abs = _rel_pos(1) + _vehicleLocalPosition.y;
@@ -184,11 +192,12 @@ void LandingTargetEstimator::update()
 
 	} else {
 		// update
-		bool update_x = _kalman_filter_x.update(x_abs, _params.meas_unc * dist * dist);
-		bool update_y = _kalman_filter_y.update(y_abs, _params.meas_unc * dist * dist);
+		float dist_squared = dist_to_bottom * dist_to_bottom;
+		bool update_x = _kalman_filter_x.update(x_abs, _params.meas_unc * dist_squared);
+		bool update_y = _kalman_filter_y.update(y_abs, _params.meas_unc * dist_squared);
 
-		bool zero_update_x = _kalman_filter_zero_x.update(zero_x_abs, _params.meas_unc * dist * dist);
-		bool zero_update_y = _kalman_filter_zero_y.update(zero_y_abs, _params.meas_unc * dist * dist);
+		bool zero_update_x = _kalman_filter_zero_x.update(zero_x_abs, _params.meas_unc * dist_squared);
+		bool zero_update_y = _kalman_filter_zero_y.update(zero_y_abs, _params.meas_unc * dist_squared);
 
 		if (!update_x || !update_y) {
 			if (!_faulty) {
@@ -236,7 +245,7 @@ void LandingTargetEstimator::update()
 			_target_pose.rel_vel_valid = !_faulty;
 			_target_pose.x_rel = x - _vehicleLocalPosition.x;
 			_target_pose.y_rel = y - _vehicleLocalPosition.y;
-			_target_pose.z_rel = dist;
+			_target_pose.z_rel = dist_to_marker;
 			if (_vehicleLocalPosition.v_xy_valid) {
 				_target_pose.vx_rel = xvel - _vehicleLocalPosition.vx;
 				_target_pose.vy_rel = yvel - _vehicleLocalPosition.vy;

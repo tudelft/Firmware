@@ -145,8 +145,8 @@ public:
 
 private:
 	void init_search_triplet();
-	void update_approach_land_speed(float h);
-	void update_approach(float h);
+	void update_approach_land_speed(float height);
+	void update_approach(float height);
 	bool in_acceptance_range();
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
